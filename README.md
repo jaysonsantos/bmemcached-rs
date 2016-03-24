@@ -5,4 +5,4 @@ Rust binary memcached implementation (ON GOING)
 I am trying to learn rust by reimplementing a python project that I wrote.
 
 # IMPORTANT
-This **do not** work yet
+This **does not** work yet
