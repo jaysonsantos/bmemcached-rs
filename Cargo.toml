@@ -1,0 +1,7 @@
+[package]
+name = "bmemcached"
+version = "0.1.0"
+authors = ["Jayson Reis <santosdosreis@gmail.com>"]
+
+[dependencies]
+byteorder = "*"
