@@ -1,9 +1,13 @@
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::mem::size_of;
 use std::net::{
     TcpStream,
     ToSocketAddrs
 };
+use std::str::{
+    from_utf8
+};
+
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 
 enum Types {
@@ -11,6 +15,7 @@ enum Types {
     Response = 0x81
 }
 
+#[derive(Debug)]
 enum Commands {
     Get = 0x00,
     Set = 0x01,
@@ -81,10 +86,12 @@ impl Protocol {
 
     fn set(&mut self, key: &'static str, value: &'static str, time: u32) -> usize {
         let extras_length = size_of::<SetAddReplace>() as u8;
+        println!("Using command {:?} with value {:?}", Commands::Set, Commands::Set as u8);
+        println!("Extras length {:?}", extras_length);
         let request = Request{magic: Types::Request as u8, opcode: Commands::Set as u8,
             key_length: key.len() as u16,
             extras_length: extras_length,
-            data_type: 0, reserved: 0, body_length: value.len() as u32 + extras_length as u32,
+            data_type: 0, reserved: 0, body_length: key.len() as u32 + value.len() as u32 + extras_length as u32,
             opaque: 0, cas: 0x00};
         let mut buf = vec![];
         buf.write_u8(request.magic).unwrap();
@@ -108,10 +115,49 @@ impl Protocol {
         println!("{:?} {}", outbuf, outbuf.len());
         wrote_size
     }
+
+    fn get(&mut self, key: &'static str) -> String {
+        println!("Get");
+        let request = Request{magic: Types::Request as u8, opcode: Commands::Get as u8,
+            key_length: key.len() as u16,
+            extras_length: 0,
+            data_type: 0, reserved: 0, body_length: key.len() as u32,
+            opaque: 0, cas: 0x00};
+            let mut buf = vec![];
+            buf.write_u8(request.magic).unwrap();
+            buf.write_u8(request.opcode).unwrap();
+            buf.write_u16::<BigEndian>(request.key_length).unwrap();
+            buf.write_u8(request.extras_length).unwrap();
+            buf.write_u8(request.data_type).unwrap();
+            buf.write_u16::<BigEndian>(request.reserved).unwrap();
+            buf.write_u32::<BigEndian>(request.body_length).unwrap();
+            buf.write_u32::<BigEndian>(request.opaque).unwrap();
+            buf.write_u64::<BigEndian>(request.cas).unwrap();
+            buf.write(key.as_bytes()).unwrap();
+            println!("Request read {:?}", buf);
+            self.connection.write(buf.as_slice()).unwrap();
+            let mut outbuf = [0; 24];
+            self.connection.read_exact(&mut outbuf).unwrap();
+            println!("Got {:?} of size {:?}", outbuf, outbuf.len());
+            let mut cur = Cursor::new(outbuf);
+            assert_eq!(Types::Response as u8, cur.read_u8().unwrap());
+            let mut read_return = [0; 5];
+            self.connection.read_u32::<BigEndian>().unwrap();
+            self.connection.read_exact(&mut read_return);
+            let a = from_utf8(&read_return).unwrap();
+            a.to_owned()
+    }
 }
 
 #[test]
 fn test_set_key() {
     let mut p = Protocol::connect("127.0.0.1:11211");
-    assert_eq!(p.set("abc", "123", 100), 201);
+    assert_eq!(p.set("Hello", "World", 100), 201);
+}
+
+#[test]
+fn test_get_key() {
+    let mut p = Protocol::connect("127.0.0.1:11211");
+    p.set("Hello", "World", 100);
+    assert_eq!(p.get("Hello"),  "World");
 }
