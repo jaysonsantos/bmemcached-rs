@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Write, Error};
 use std::mem::size_of;
 use std::net::{
     TcpStream,
@@ -10,13 +10,15 @@ use std::str::{
 
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 
-enum Types {
+use errors::BMemcachedError;
+
+enum Type {
     Request = 0x80,
     Response = 0x81
 }
 
 #[derive(Debug)]
-enum Commands {
+enum Command {
     Get = 0x00,
     Set = 0x01,
     Add = 0x02,
@@ -46,6 +48,16 @@ enum Commands {
     PrependQ = 0x1A
 }
 
+#[derive(Debug)]
+enum Status {
+    Success = 0x00,
+    KeyNotFound = 0x01,
+    KeyExists = 0x02,
+    AuthError = 0x08,
+    UnknownCommand = 0x81
+}
+
+#[derive(Debug)]
 pub struct Request {
     magic: u8,
     opcode: u8,
@@ -86,49 +98,50 @@ impl Protocol {
         Protocol{connection: TcpStream::connect(addr).unwrap()}
     }
 
-    fn build_request(command: Commands, key_length: usize, value_length: usize, data_type: u8, extras_length: usize, cas: u64) -> Request {
+    fn build_request(command: Command, key_length: usize, value_length: usize, data_type: u8, extras_length: usize, cas: u64) -> Request {
         Request {
-            magic: Types::Request as u8, opcode: command as u8,
+            magic: Type::Request as u8, opcode: command as u8,
             key_length: key_length as u16,
             extras_length: extras_length as u8,
-            data_type: data_type, reserved: 0, body_length: (key_length + value_length + extras_length) as u32,
-            opaque: 0, cas: 0x00
+            data_type: data_type, reserved: 0,
+            body_length: (key_length + value_length + extras_length) as u32,
+            opaque: 0, cas: cas
         }
     }
 
-    fn write_request(&self, request: Request, final_payload: &[u8]) -> usize {
+    fn write_request(&self, request: Request, final_payload: &[u8]) -> Result<(), BMemcachedError> {
         let mut buf = &self.connection;
-        buf.write_u8(request.magic).unwrap();
-        buf.write_u8(request.opcode).unwrap();
-        buf.write_u16::<BigEndian>(request.key_length).unwrap();
-        buf.write_u8(request.extras_length).unwrap();
-        buf.write_u8(request.data_type).unwrap();
-        buf.write_u16::<BigEndian>(request.reserved).unwrap();
-        buf.write_u32::<BigEndian>(request.body_length).unwrap();
-        buf.write_u32::<BigEndian>(request.opaque).unwrap();
-        buf.write_u64::<BigEndian>(request.cas).unwrap();
-        buf.write(final_payload).unwrap()
+        try!(buf.write_u8(request.magic));
+        try!(buf.write_u8(request.opcode));
+        try!(buf.write_u16::<BigEndian>(request.key_length));
+        try!(buf.write_u8(request.extras_length));
+        try!(buf.write_u8(request.data_type));
+        try!(buf.write_u16::<BigEndian>(request.reserved));
+        try!(buf.write_u32::<BigEndian>(request.body_length));
+        try!(buf.write_u32::<BigEndian>(request.opaque));
+        try!(buf.write_u64::<BigEndian>(request.cas));
+        try!(buf.write(final_payload));
+        Ok(())
     }
 
-    fn set_add_replace(&mut self, command: Commands, key: &'static str, value: &'static str, time: u32) -> usize {
+    fn set_add_replace(&mut self, command: Command, key: String, value: String, time: u32) {
         let extras_length = size_of::<SetAddReplace>();
         let request = Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00);
         let mut final_payload = vec![];
         // Flags
-        final_payload.write_u32::<BigEndian>(0);
+        final_payload.write_u32::<BigEndian>(0).unwrap();
         final_payload.write_u32::<BigEndian>(time).unwrap();
         // After flags key and value
         final_payload.write(key.as_bytes()).unwrap();
         final_payload.write(value.as_bytes()).unwrap();
-        let size = self.write_request(request, final_payload.as_slice());
+        let size = self.write_request(request, final_payload.as_slice()).unwrap();
         self.read_response();
-        size
     }
 
     fn read_response(&mut self) -> Response {
         let mut buf = &self.connection;
         let magic: u8 = buf.read_u8().unwrap();
-        assert_eq!(magic, Types::Response as u8);
+        assert_eq!(magic, Type::Response as u8);
         Response {
             magic: magic,
             opcode: buf.read_u8().unwrap(),
@@ -142,20 +155,20 @@ impl Protocol {
         }
     }
 
-    fn set(&mut self, key: &'static str, value: &'static str, time: u32) -> usize {
-        self.set_add_replace(Commands::Set, key, value, time)
+    fn set(&mut self, key: String, value: String, time: u32) {
+        self.set_add_replace(Command::Set, key, value, time)
     }
 
-    fn add(&mut self, key: &'static str, value: &'static str, time: u32) -> usize {
-        self.set_add_replace(Commands::Add, key, value, time)
+    fn add(&mut self, key: String, value: String, time: u32) {
+        self.set_add_replace(Command::Add, key, value, time)
     }
 
-    fn replace(&mut self, key: &'static str, value: &'static str, time: u32) -> usize {
-        self.set_add_replace(Commands::Replace, key, value, time)
+    fn replace(&mut self, key: String, value: String, time: u32) {
+        self.set_add_replace(Command::Replace, key, value, time)
     }
 
-    fn get(&mut self, key: &'static str) -> String {
-        let request = Protocol::build_request(Commands::Get, key.len(), 0 as usize, 0, 0, 0x00);
+    fn get(&mut self, key: String) -> String {
+        let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
         self.write_request(request, key.as_bytes());
         let response = self.read_response();
         // Discard extras for now
@@ -171,6 +184,8 @@ impl Protocol {
 #[test]
 fn test_get_key() {
     let mut p = Protocol::connect("127.0.0.1:11211");
-    p.set("Hello", "World", 100);
-    assert_eq!(p.get("Hello"),  "World");
+    let key = "Hello".to_string();
+    let value = "World".to_string();
+    p.set(key.to_owned(), value.to_owned(), 100);
+    assert_eq!(p.get(key.to_owned()),  value.to_owned());
 }

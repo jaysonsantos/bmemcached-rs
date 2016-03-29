@@ -1,2 +1,3 @@
 extern crate byteorder;
-mod protocol;
+pub mod errors;
+pub mod protocol;
