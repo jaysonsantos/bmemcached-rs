@@ -184,7 +184,7 @@ impl Protocol {
             Some(Status::Success) => {},
             Some(status) => return Err(BMemcachedError::Status(status)),
             None => return Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
-        }
+        };
         // Discard extras for now
         try!(self.connection.read_u32::<BigEndian>());
         let mut outbuf = vec![0; (response.body_length - response.extras_length as u32) as usize];
@@ -205,10 +205,10 @@ fn test_set_key() {
 #[test]
 fn test_add_key() {
     let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-    let key = "Hello".to_string();
+    let key = "Hello Add".to_string();
     let value = "World".to_string();
-    p.add(key.to_owned(), value.to_owned(), 100).unwrap();
-    let result = p.add(key.to_owned(), value.to_owned(), 100);
+    p.add(key.to_owned(), value.to_owned(), 10).unwrap();
+    let result = p.add(key.to_owned(), value.to_owned(), 10);
     match result {
         Ok(()) => panic!("Add key should return error"),
         Err(BMemcachedError::Status(Status::KeyExists)) => return,
@@ -224,7 +224,8 @@ fn test_get_key() {
     p.set(key.to_owned(), value.to_owned(), 100).unwrap();
     assert_eq!(p.get(key.to_owned()).unwrap(),  value.to_owned());
     match p.get("not found".to_string()) {
-        BMemcachedError::Status(Status::KeyNotFound) => return,
-        Err(_) => panic!("This key should not exist")
+        Ok(_) => panic!("This key should not exist"),
+        Err(BMemcachedError::Status(Status::KeyNotFound)) => return,
+        Err(_) => panic!("This should return KeyNotFound")
     }
 }
