@@ -93,12 +93,13 @@ pub struct Protocol {
 }
 
 impl Protocol {
-    pub fn connect<A: ToSocketAddrs>(addr: A) -> Protocol {
+    pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Protocol, BMemcachedError> {
         assert_eq!(size_of::<Response>(), 24);
-        Protocol{connection: TcpStream::connect(addr).unwrap()}
+        Ok(Protocol{connection: try!(TcpStream::connect(addr))})
     }
 
-    fn build_request(command: Command, key_length: usize, value_length: usize, data_type: u8, extras_length: usize, cas: u64) -> Request {
+    fn build_request(command: Command, key_length: usize, value_length: usize, data_type: u8,
+        extras_length: usize, cas: u64) -> Request {
         Request {
             magic: Type::Request as u8, opcode: command as u8,
             key_length: key_length as u16,
@@ -135,25 +136,24 @@ impl Protocol {
         try!(final_payload.write(key.as_bytes()));
         try!(final_payload.write(value.as_bytes()));
         let size = try!(self.write_request(request, final_payload.as_slice()));
-        self.read_response();
+        let response = try!(self.read_response());
         Ok(())
     }
 
-    fn read_response(&mut self) -> Response {
+    fn read_response(&mut self) -> Result<Response, BMemcachedError> {
         let mut buf = &self.connection;
-        let magic: u8 = buf.read_u8().unwrap();
-        assert_eq!(magic, Type::Response as u8);
-        Response {
+        let magic: u8 = try!(buf.read_u8());
+        Ok(Response {
             magic: magic,
-            opcode: buf.read_u8().unwrap(),
-            key_length: buf.read_u16::<BigEndian>().unwrap(),
-            extras_length: buf.read_u8().unwrap(),
-            data_type: buf.read_u8().unwrap(),
-            status: buf.read_u16::<BigEndian>().unwrap(),
-            body_length: buf.read_u32::<BigEndian>().unwrap(),
-            opaque: buf.read_u32::<BigEndian>().unwrap(),
-            cas: buf.read_u64::<BigEndian>().unwrap()
-        }
+            opcode: try!(buf.read_u8()),
+            key_length: try!(buf.read_u16::<BigEndian>()),
+            extras_length: try!(buf.read_u8()),
+            data_type: try!(buf.read_u8()),
+            status: try!(buf.read_u16::<BigEndian>()),
+            body_length: try!(buf.read_u32::<BigEndian>()),
+            opaque: try!(buf.read_u32::<BigEndian>()),
+            cas: try!(buf.read_u64::<BigEndian>())
+        })
     }
 
     fn set(&mut self, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
@@ -171,7 +171,7 @@ impl Protocol {
     fn get(&mut self, key: String) -> Result<String, BMemcachedError> {
         let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
         self.write_request(request, key.as_bytes());
-        let response = self.read_response();
+        let response = try!(self.read_response());
         // Discard extras for now
         try!(self.connection.read_u32::<BigEndian>());
         let mut outbuf = vec![0; (response.body_length - response.extras_length as u32) as usize];
@@ -183,7 +183,7 @@ impl Protocol {
 
 #[test]
 fn test_set_key() {
-    let mut p = Protocol::connect("127.0.0.1:11211");
+    let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
     let key = "Hello".to_string();
     let value = "World".to_string();
     p.set(key.to_owned(), value.to_owned(), 100).unwrap()
@@ -191,7 +191,7 @@ fn test_set_key() {
 
 #[test]
 fn test_get_key() {
-    let mut p = Protocol::connect("127.0.0.1:11211");
+    let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
     let key = "Hello".to_string();
     let value = "World".to_string();
     p.set(key.to_owned(), value.to_owned(), 100).unwrap();
