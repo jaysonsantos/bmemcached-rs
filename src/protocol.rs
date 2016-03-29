@@ -182,10 +182,18 @@ impl Protocol {
 }
 
 #[test]
+fn test_set_key() {
+    let mut p = Protocol::connect("127.0.0.1:11211");
+    let key = "Hello".to_string();
+    let value = "World".to_string();
+    p.set(key.to_owned(), value.to_owned(), 100).unwrap()
+}
+
+#[test]
 fn test_get_key() {
     let mut p = Protocol::connect("127.0.0.1:11211");
     let key = "Hello".to_string();
     let value = "World".to_string();
     p.set(key.to_owned(), value.to_owned(), 100).unwrap();
-    assert_eq!(p.get(key.to_owned()).unwrap(),  value.to_owned());
+    assert_eq!(p.get(key.to_owned()).unwrap(),  value.to_owned())
 }
