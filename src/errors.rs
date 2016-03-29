@@ -1,10 +1,14 @@
 use std::io;
 use std::str;
 
+use protocol::Status;
+
 #[derive(Debug)]
 pub enum BMemcachedError {
     IoError(io::Error),
-    Utf8Error(str::Utf8Error)
+    Utf8Error(str::Utf8Error),
+    UnkownError(&'static str),
+    Status(Status)
 }
 
 impl From<io::Error> for BMemcachedError {

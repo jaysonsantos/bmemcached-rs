@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read, Write, Error};
+use std::io::{Read, Write};
 use std::mem::size_of;
 use std::net::{
     TcpStream,
@@ -9,6 +9,7 @@ use std::str::{
 };
 
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
+use num::FromPrimitive;
 
 use errors::BMemcachedError;
 
@@ -48,13 +49,16 @@ enum Command {
     PrependQ = 0x1A
 }
 
-#[derive(Debug)]
-enum Status {
-    Success = 0x00,
-    KeyNotFound = 0x01,
-    KeyExists = 0x02,
-    AuthError = 0x08,
-    UnknownCommand = 0x81
+
+enum_from_primitive! {
+    #[derive(Debug, PartialEq)]
+    pub enum Status {
+        Success = 0x00,
+        KeyNotFound = 0x01,
+        KeyExists = 0x02,
+        AuthError = 0x08,
+        UnknownCommand = 0x81
+    }
 }
 
 #[derive(Debug)]
@@ -125,21 +129,6 @@ impl Protocol {
         Ok(())
     }
 
-    fn set_add_replace(&mut self, command: Command, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
-        let extras_length = size_of::<SetAddReplace>();
-        let request = Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00);
-        let mut final_payload = vec![];
-        // Flags
-        try!(final_payload.write_u32::<BigEndian>(0));
-        try!(final_payload.write_u32::<BigEndian>(time));
-        // After flags key and value
-        try!(final_payload.write(key.as_bytes()));
-        try!(final_payload.write(value.as_bytes()));
-        let size = try!(self.write_request(request, final_payload.as_slice()));
-        let response = try!(self.read_response());
-        Ok(())
-    }
-
     fn read_response(&mut self) -> Result<Response, BMemcachedError> {
         let mut buf = &self.connection;
         let magic: u8 = try!(buf.read_u8());
@@ -154,6 +143,25 @@ impl Protocol {
             opaque: try!(buf.read_u32::<BigEndian>()),
             cas: try!(buf.read_u64::<BigEndian>())
         })
+    }
+
+    fn set_add_replace(&mut self, command: Command, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
+        let extras_length = size_of::<SetAddReplace>();
+        let request = Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00);
+        let mut final_payload = vec![];
+        // Flags
+        try!(final_payload.write_u32::<BigEndian>(0));
+        try!(final_payload.write_u32::<BigEndian>(time));
+        // After flags key and value
+        try!(final_payload.write(key.as_bytes()));
+        try!(final_payload.write(value.as_bytes()));
+        let size = try!(self.write_request(request, final_payload.as_slice()));
+        let response = try!(self.read_response());
+        match Status::from_u16(response.status) {
+            Some(Status::Success) => Ok(()),
+            Some(rest) => Err(BMemcachedError::Status(rest)),
+            None => Err(BMemcachedError::UnkownError("Server returned an unknown status code"))
+        }
     }
 
     fn set(&mut self, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
@@ -172,6 +180,11 @@ impl Protocol {
         let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
         self.write_request(request, key.as_bytes());
         let response = try!(self.read_response());
+        match Status::from_u16(response.status) {
+            Some(Status::Success) => {},
+            Some(status) => return Err(BMemcachedError::Status(status)),
+            None => return Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
+        }
         // Discard extras for now
         try!(self.connection.read_u32::<BigEndian>());
         let mut outbuf = vec![0; (response.body_length - response.extras_length as u32) as usize];
@@ -190,10 +203,28 @@ fn test_set_key() {
 }
 
 #[test]
+fn test_add_key() {
+    let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+    let key = "Hello".to_string();
+    let value = "World".to_string();
+    p.add(key.to_owned(), value.to_owned(), 100).unwrap();
+    let result = p.add(key.to_owned(), value.to_owned(), 100);
+    match result {
+        Ok(()) => panic!("Add key should return error"),
+        Err(BMemcachedError::Status(Status::KeyExists)) => return,
+        Err(_) => panic!("Some strange error that should not happen")
+    }
+}
+
+#[test]
 fn test_get_key() {
     let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
     let key = "Hello".to_string();
     let value = "World".to_string();
     p.set(key.to_owned(), value.to_owned(), 100).unwrap();
-    assert_eq!(p.get(key.to_owned()).unwrap(),  value.to_owned())
+    assert_eq!(p.get(key.to_owned()).unwrap(),  value.to_owned());
+    match p.get("not found".to_string()) {
+        BMemcachedError::Status(Status::KeyNotFound) => return,
+        Err(_) => panic!("This key should not exist")
+    }
 }
