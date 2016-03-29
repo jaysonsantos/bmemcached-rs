@@ -124,18 +124,19 @@ impl Protocol {
         Ok(())
     }
 
-    fn set_add_replace(&mut self, command: Command, key: String, value: String, time: u32) {
+    fn set_add_replace(&mut self, command: Command, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
         let extras_length = size_of::<SetAddReplace>();
         let request = Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00);
         let mut final_payload = vec![];
         // Flags
-        final_payload.write_u32::<BigEndian>(0).unwrap();
-        final_payload.write_u32::<BigEndian>(time).unwrap();
+        try!(final_payload.write_u32::<BigEndian>(0));
+        try!(final_payload.write_u32::<BigEndian>(time));
         // After flags key and value
-        final_payload.write(key.as_bytes()).unwrap();
-        final_payload.write(value.as_bytes()).unwrap();
-        let size = self.write_request(request, final_payload.as_slice()).unwrap();
+        try!(final_payload.write(key.as_bytes()));
+        try!(final_payload.write(value.as_bytes()));
+        let size = try!(self.write_request(request, final_payload.as_slice()));
         self.read_response();
+        Ok(())
     }
 
     fn read_response(&mut self) -> Response {
@@ -155,29 +156,28 @@ impl Protocol {
         }
     }
 
-    fn set(&mut self, key: String, value: String, time: u32) {
+    fn set(&mut self, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
         self.set_add_replace(Command::Set, key, value, time)
     }
 
-    fn add(&mut self, key: String, value: String, time: u32) {
+    fn add(&mut self, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
         self.set_add_replace(Command::Add, key, value, time)
     }
 
-    fn replace(&mut self, key: String, value: String, time: u32) {
+    fn replace(&mut self, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
         self.set_add_replace(Command::Replace, key, value, time)
     }
 
-    fn get(&mut self, key: String) -> String {
+    fn get(&mut self, key: String) -> Result<String, BMemcachedError> {
         let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
         self.write_request(request, key.as_bytes());
         let response = self.read_response();
         // Discard extras for now
-        self.connection.read_u32::<BigEndian>().unwrap();
+        try!(self.connection.read_u32::<BigEndian>());
         let mut outbuf = vec![0; (response.body_length - response.extras_length as u32) as usize];
-        self.connection.read_exact(&mut outbuf).unwrap();
-        println!("{:?} {:?}", outbuf, outbuf.len());
-        let a = from_utf8(&outbuf).unwrap();
-        a.to_owned()
+        try!(self.connection.read_exact(&mut outbuf));
+        let a = try!(from_utf8(&outbuf));
+        Ok(a.to_owned())
     }
 }
 
@@ -186,6 +186,6 @@ fn test_get_key() {
     let mut p = Protocol::connect("127.0.0.1:11211");
     let key = "Hello".to_string();
     let value = "World".to_string();
-    p.set(key.to_owned(), value.to_owned(), 100);
-    assert_eq!(p.get(key.to_owned()),  value.to_owned());
+    p.set(key.to_owned(), value.to_owned(), 100).unwrap();
+    assert_eq!(p.get(key.to_owned()).unwrap(),  value.to_owned());
 }
