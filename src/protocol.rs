@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 use std::io::{Read, Write};
 use std::mem::size_of;
 use std::net::{
@@ -132,6 +133,10 @@ impl Protocol {
     fn read_response(&mut self) -> Result<Response, BMemcachedError> {
         let mut buf = &self.connection;
         let magic: u8 = try!(buf.read_u8());
+        if magic != Type::Response as u8 {
+            // TODO Consume the stream, disconnect or something?
+            return Err(BMemcachedError::UnkownError("Server sent an unknown magi code"))
+        }
         Ok(Response {
             magic: magic,
             opcode: try!(buf.read_u8()),
