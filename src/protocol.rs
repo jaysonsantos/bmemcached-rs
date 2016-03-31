@@ -5,9 +5,6 @@ use std::net::{
     TcpStream,
     ToSocketAddrs
 };
-use std::str::{
-    from_utf8
-};
 
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use num::FromPrimitive;
@@ -194,8 +191,7 @@ impl Protocol {
         try!(self.connection.read_u32::<BigEndian>());
         let mut outbuf = vec![0; (response.body_length - response.extras_length as u32) as usize];
         try!(self.connection.read_exact(&mut outbuf));
-        let a = try!(from_utf8(&outbuf));
-        Ok(a.to_owned())
+        Ok(try!(String::from_utf8(outbuf)))
     }
 }
 

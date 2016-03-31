@@ -1,12 +1,12 @@
 use std::io;
-use std::str;
+use std::string;
 
 use protocol::Status;
 
 #[derive(Debug)]
 pub enum BMemcachedError {
     IoError(io::Error),
-    Utf8Error(str::Utf8Error),
+    Utf8Error(string::FromUtf8Error),
     UnkownError(&'static str),
     Status(Status)
 }
@@ -17,8 +17,8 @@ impl From<io::Error> for BMemcachedError {
     }
 }
 
-impl From<str::Utf8Error> for BMemcachedError {
-    fn from(err: str::Utf8Error) -> BMemcachedError {
+impl From<string::FromUtf8Error> for BMemcachedError {
+    fn from(err: string::FromUtf8Error) -> BMemcachedError {
         BMemcachedError::Utf8Error(err)
     }
 }
