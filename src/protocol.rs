@@ -1,4 +1,3 @@
-#[allow(dead_code)]
 use std::io::{Read, Write};
 use std::mem::size_of;
 use std::net::{
@@ -147,7 +146,10 @@ impl Protocol {
         })
     }
 
-    fn set_add_replace(&mut self, command: Command, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
+    fn set_add_replace<K, V>(&mut self, command: Command, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+        where K: AsRef<[u8]>, V: AsRef<[u8]> {
+        let key = key.as_ref();
+        let value = value.as_ref();
         let extras_length = size_of::<SetAddReplace>();
         let request = Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00);
         let mut final_payload = vec![];
@@ -155,8 +157,8 @@ impl Protocol {
         try!(final_payload.write_u32::<BigEndian>(0));
         try!(final_payload.write_u32::<BigEndian>(time));
         // After flags key and value
-        try!(final_payload.write(key.as_bytes()));
-        try!(final_payload.write(value.as_bytes()));
+        try!(final_payload.write(key));
+        try!(final_payload.write(value));
         let size = try!(self.write_request(request, final_payload.as_slice()));
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
@@ -166,21 +168,25 @@ impl Protocol {
         }
     }
 
-    fn set(&mut self, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
+    fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+        where K: AsRef<[u8]>, V: AsRef<[u8]> {
         self.set_add_replace(Command::Set, key, value, time)
     }
 
-    fn add(&mut self, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
+    fn add<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+        where K: AsRef<[u8]>, V: AsRef<[u8]> {
         self.set_add_replace(Command::Add, key, value, time)
     }
 
-    fn replace(&mut self, key: String, value: String, time: u32) -> Result<(), BMemcachedError> {
+    fn replace<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+        where K: AsRef<[u8]>, V: AsRef<[u8]> {
         self.set_add_replace(Command::Replace, key, value, time)
     }
 
-    fn get(&mut self, key: String) -> Result<String, BMemcachedError> {
+    fn get<K>(&mut self, key: K) -> Result<String, BMemcachedError> where K: AsRef<[u8]> {
+        let key = key.as_ref();
         let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
-        self.write_request(request, key.as_bytes());
+        self.write_request(request, key);
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
             Some(Status::Success) => {},
@@ -198,18 +204,18 @@ impl Protocol {
 #[test]
 fn test_set_key() {
     let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-    let key = "Hello".to_string();
-    let value = "World".to_string();
-    p.set(key.to_owned(), value.to_owned(), 100).unwrap()
+    let key = "Hello";
+    let value = "World";
+    p.set(key, value, 100).unwrap()
 }
 
 #[test]
 fn test_add_key() {
     let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-    let key = "Hello Add".to_string();
-    let value = "World".to_string();
-    p.add(key.to_owned(), value.to_owned(), 10).unwrap();
-    let result = p.add(key.to_owned(), value.to_owned(), 10);
+    let key = "Hello Add";
+    let value = "World";
+    p.add(key, value, 10).unwrap();
+    let result = p.add(key, value, 10);
     match result {
         Ok(()) => panic!("Add key should return error"),
         Err(BMemcachedError::Status(Status::KeyExists)) => return,
@@ -220,10 +226,10 @@ fn test_add_key() {
 #[test]
 fn test_get_key() {
     let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-    let key = "Hello".to_string();
-    let value = "World".to_string();
-    p.set(key.to_owned(), value.to_owned(), 100).unwrap();
-    assert_eq!(p.get(key.to_owned()).unwrap(),  value.to_owned());
+    let key = "Hello";
+    let value = "World";
+    p.set(key, value, 100).unwrap();
+    assert_eq!(p.get(key).unwrap(),  value);
     match p.get("not found".to_string()) {
         Ok(_) => panic!("This key should not exist"),
         Err(BMemcachedError::Status(Status::KeyNotFound)) => return,
