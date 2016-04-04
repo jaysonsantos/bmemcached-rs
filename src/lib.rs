@@ -1,8 +1,10 @@
 #[allow(dead_code)]
 #[macro_use] extern crate enum_primitive;
+extern crate conhash;
 extern crate byteorder;
 extern crate num;
 
+pub mod client;
 pub mod errors;
 mod protocol;
 
