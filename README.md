@@ -1,4 +1,4 @@
-# bmemcached-rs
+# bmemcached-rs [![Build Status](https://travis-ci.org/jaysonsantos/bmemcached-rs.svg?branch=master)](https://travis-ci.org/jaysonsantos/bmemcached-rs)
 Rust binary memcached implementation (ON GOING)
 
 # Why
