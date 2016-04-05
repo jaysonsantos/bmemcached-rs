@@ -219,7 +219,7 @@ fn test_add_key() {
     let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
     let key = "Hello Add";
     let value = "World";
-    p.add(key, value, 1).unwrap();
+    p.add(key, value, 10).unwrap();
     let result = p.add(key, value, 10);
     match result {
         Ok(()) => panic!("Add key should return error"),
