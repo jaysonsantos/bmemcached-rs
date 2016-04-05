@@ -56,7 +56,6 @@ impl MemcachedClient {
 mod tests {
     use std::sync::Arc;
     use std::thread;
-    use std::time::Duration;
     use super::*;
 
     #[test]
@@ -70,7 +69,6 @@ mod tests {
                 let data = format!("data_n{}", i);
                 client.set(&data, &data, 100);
                 let val = client.get(&data).unwrap();
-                thread::sleep(Duration::from_secs(10));
                 val
             }));
         }
