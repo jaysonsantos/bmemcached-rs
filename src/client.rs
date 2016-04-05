@@ -20,15 +20,13 @@ struct ClonableProtocol {
 impl Node for ClonableProtocol {
     fn name(&self) -> String {
         let protocol = self.clone();
-        "".to_string()
+        format!("{:?}", protocol)
     }
 }
 
 pub struct MemcachedClient {
     connections: ConsistentHash<ClonableProtocol>
 }
-
-unsafe impl Send for MemcachedClient {}
 
 impl MemcachedClient {
     fn new<A: ToSocketAddrs>(addrs: Vec<A>) -> Result<MemcachedClient, errors::BMemcachedError> {
@@ -40,42 +38,44 @@ impl MemcachedClient {
         Ok(MemcachedClient {connections: ch})
     }
 
-    fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
+    fn set<K, V>(&self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
         where K: AsRef<[u8]>, V: AsRef<[u8]> {
         let mut clonable_protocol = self.connections.get(key.as_ref()).unwrap();
-        let mut lock = clonable_protocol.connection.clone();
-        let mut protocol = lock.lock().unwrap();
+        let mut protocol = clonable_protocol.connection.lock().unwrap();
         protocol.set(key, value, time)
     }
 
-    fn get<K>(&mut self, key: K) -> Result<String, errors::BMemcachedError> where K: AsRef<[u8]> {
+    fn get<K>(&self, key: K) -> Result<String, errors::BMemcachedError> where K: AsRef<[u8]> {
         let mut clonable_protocol = self.connections.get(key.as_ref()).unwrap();
-        let mut lock = clonable_protocol.connection.clone();
-        let mut protocol = lock.lock().unwrap();
+        let mut protocol = clonable_protocol.connection.lock().unwrap();
         protocol.get(key)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use std::sync::Arc;
     use std::thread;
+    use std::time::Duration;
     use super::*;
 
     #[test]
-    fn test_abc() {
-        let mut client = MemcachedClient::new(vec!["127.0.0.1:11211", "127.0.0.1:11211"]).unwrap();
+    fn test_multiple_threads() {
         let mut threads = vec![];
-        for i in 1..10 {
+        for i in 0..3 {
+            debug!("Starting thread {}", i);
+            let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211"]).unwrap());
             threads.push(thread::spawn(move || {
+                let client = client.clone();
                 let data = format!("data_n{}", i);
                 client.set(&data, &data, 100);
-                client.get(&data).unwrap()
+                let val = client.get(&data).unwrap();
+                thread::sleep(Duration::from_secs(10));
+                val
             }));
         }
-        for i in 1..10 {
-            let result = threads[i].join();
+        for (i, thread) in threads.into_iter().enumerate() {
+            let result = thread.join();
             assert_eq!(result.unwrap(), format!("data_n{}", i));
         }
     }

@@ -5,6 +5,8 @@ authors = ["Jayson Reis <santosdosreis@gmail.com>"]
 
 [dependencies]
 byteorder = "0.5.1"
-conhash = "*"
+conhash = {git = "https://github.com/mbrubeck/conhash-rs/", rev="00a8acd665a066e83dea33390c57abbcc5219649" }
 enum_primitive = "0.1.0"
+env_logger = "*"
+log = "*"
 num = "0.1.31"

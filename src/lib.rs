@@ -1,11 +1,10 @@
-#[allow(dead_code)]
-#[macro_use] extern crate enum_primitive;
-extern crate conhash;
+extern crate env_logger;
 extern crate byteorder;
+extern crate conhash;
+#[macro_use] extern crate enum_primitive;
+#[macro_use] extern crate log;
 extern crate num;
 
 pub mod client;
 pub mod errors;
 mod protocol;
-
-// TODO: The idea is to implement some sort of a front-end to Protocol to be able to do some consistent hashing to distribute data between servers.
