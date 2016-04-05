@@ -20,7 +20,8 @@ struct ClonableProtocol {
 impl Node for ClonableProtocol {
     fn name(&self) -> String {
         let protocol = self.clone();
-        format!("{:?}", protocol)
+        let connection = protocol.connection.lock().unwrap();
+        connection.connection_info()
     }
 }
 
@@ -62,9 +63,9 @@ mod tests {
     fn test_multiple_threads() {
         let mut threads = vec![];
         for i in 0..3 {
-            debug!("Starting thread {}", i);
             let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211"]).unwrap());
             threads.push(thread::spawn(move || {
+                debug!("Ae");
                 let client = client.clone();
                 let data = format!("data_n{}", i);
                 client.set(&data, &data, 100);

@@ -100,6 +100,10 @@ impl Protocol {
         Ok(Protocol{connection: try!(TcpStream::connect(addr))})
     }
 
+    pub fn connection_info(&self) -> String {
+        format!("{:?}", self.connection.peer_addr().unwrap())
+    }
+
     fn build_request(command: Command, key_length: usize, value_length: usize, data_type: u8,
         extras_length: usize, cas: u64) -> Request {
         Request {
