@@ -6,6 +6,7 @@ use std::net::{
 };
 
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
+use conhash::Node;
 use num::FromPrimitive;
 
 use errors::BMemcachedError;
@@ -89,14 +90,18 @@ pub struct SetAddReplace {
     expiration: u32
 }
 
+#[derive(Debug)]
 pub struct Protocol {
     connection: TcpStream
 }
 
 impl Protocol {
     pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Protocol, BMemcachedError> {
-        assert_eq!(size_of::<Response>(), 24);
         Ok(Protocol{connection: try!(TcpStream::connect(addr))})
+    }
+
+    pub fn connection_info(&self) -> String {
+        format!("{:?}", self.connection.peer_addr().unwrap())
     }
 
     fn build_request(command: Command, key_length: usize, value_length: usize, data_type: u8,
@@ -168,22 +173,22 @@ impl Protocol {
         }
     }
 
-    fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+    pub fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
         where K: AsRef<[u8]>, V: AsRef<[u8]> {
         self.set_add_replace(Command::Set, key, value, time)
     }
 
-    fn add<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+    pub fn add<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
         where K: AsRef<[u8]>, V: AsRef<[u8]> {
         self.set_add_replace(Command::Add, key, value, time)
     }
 
-    fn replace<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+    pub fn replace<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
         where K: AsRef<[u8]>, V: AsRef<[u8]> {
         self.set_add_replace(Command::Replace, key, value, time)
     }
 
-    fn get<K>(&mut self, key: K) -> Result<String, BMemcachedError> where K: AsRef<[u8]> {
+    pub fn get<K>(&mut self, key: K) -> Result<String, BMemcachedError> where K: AsRef<[u8]> {
         let key = key.as_ref();
         let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
         self.write_request(request, key);
@@ -214,7 +219,7 @@ fn test_add_key() {
     let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
     let key = "Hello Add";
     let value = "World";
-    p.add(key, value, 10).unwrap();
+    p.add(key, value, 1).unwrap();
     let result = p.add(key, value, 10);
     match result {
         Ok(()) => panic!("Add key should return error"),
