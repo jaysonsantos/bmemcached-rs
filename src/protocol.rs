@@ -252,7 +252,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = "World";
-        p.set(key, value, 100).unwrap();
+        p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
     }
 
@@ -278,7 +278,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = "World";
-        p.set(key, value, 100).unwrap();
+        p.set(key, value, 1000).unwrap();
         assert_eq!(p.get(key).unwrap(),  value);
         match p.get("not found".to_string()) {
             Ok(_) => panic!("This key should not exist"),
@@ -294,7 +294,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = "World";
-        p.set(key, value, 100).unwrap();
+        p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
         p.delete(key).unwrap();
     }
