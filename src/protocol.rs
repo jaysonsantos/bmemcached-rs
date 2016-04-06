@@ -152,6 +152,14 @@ impl Protocol {
         })
     }
 
+    fn consume_body(&mut self, size: u32) {
+        debug!("Consuming body");
+        let mut buf: Vec<u8> = vec![0; size as usize];
+        self.connection.read(&mut *buf);
+        let str_buf = String::from_utf8(buf).unwrap();
+        debug!("Consumed body {:?}", str_buf);
+    }
+
     fn set_add_replace<K, V>(&mut self, command: Command, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
         where K: AsRef<[u8]>, V: AsRef<[u8]> {
         let key = key.as_ref();
@@ -169,7 +177,10 @@ impl Protocol {
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
             Some(Status::Success) => Ok(()),
-            Some(rest) => Err(BMemcachedError::Status(rest)),
+            Some(rest) => {
+                self.consume_body(response.body_length);
+                Err(BMemcachedError::Status(rest))
+            },
             None => Err(BMemcachedError::UnkownError("Server returned an unknown status code"))
         }
     }
@@ -196,7 +207,10 @@ impl Protocol {
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
             Some(Status::Success) => {},
-            Some(status) => return Err(BMemcachedError::Status(status)),
+            Some(status) => {
+                self.consume_body(response.body_length);
+                return Err(BMemcachedError::Status(status))
+            },
             None => return Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
         };
         // Discard extras for now
@@ -214,9 +228,15 @@ impl Protocol {
 
         match Status::from_u16(response.status) {
             Some(Status::Success) => Ok(()),
-            Some(Status::KeyNotFound) => Ok(()),
-            Some(status) => return Err(BMemcachedError::Status(status)),
-            None => return Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
+            Some(Status::KeyNotFound) => {
+                self.consume_body(response.body_length);
+                Ok(())
+            },
+            Some(status) => {
+                self.consume_body(response.body_length);
+                Err(BMemcachedError::Status(status))
+            },
+            None => Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
         }
     }
 }
@@ -249,7 +269,7 @@ mod tests {
             Err(BMemcachedError::Status(Status::KeyExists)) => {},
             Err(_) => panic!("Some strange error that should not happen")
         };
-        p.delete(key).unwrap();
+        p.delete(key);
     }
 
     #[test]
