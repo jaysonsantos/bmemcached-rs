@@ -136,7 +136,8 @@ impl Protocol {
         let magic: u8 = try!(buf.read_u8());
         if magic != Type::Response as u8 {
             // TODO Consume the stream, disconnect or something?
-            return Err(BMemcachedError::UnkownError("Server sent an unknown magi code"))
+            debug!("Server sent an unknown magic code {:?}", magic);
+            return Err(BMemcachedError::UnkownError("Server sent an unknown magic code"))
         }
         Ok(Response {
             magic: magic,
@@ -204,40 +205,77 @@ impl Protocol {
         try!(self.connection.read_exact(&mut outbuf));
         Ok(try!(String::from_utf8(outbuf)))
     }
-}
 
-#[test]
-fn test_set_key() {
-    let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-    let key = "Hello";
-    let value = "World";
-    p.set(key, value, 100).unwrap()
-}
+    pub fn delete<K>(&mut self, key: K) -> Result<(), BMemcachedError> where K: AsRef<[u8]> {
+        let key = key.as_ref();
+        let request = Protocol::build_request(Command::Delete, key.len(), 0 as usize, 0, 0, 0x00);
+        self.write_request(request, key);
+        let response = try!(self.read_response());
 
-#[test]
-fn test_add_key() {
-    let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-    let key = "Hello Add";
-    let value = "World";
-    p.add(key, value, 10).unwrap();
-    let result = p.add(key, value, 10);
-    match result {
-        Ok(()) => panic!("Add key should return error"),
-        Err(BMemcachedError::Status(Status::KeyExists)) => return,
-        Err(_) => panic!("Some strange error that should not happen")
+        match Status::from_u16(response.status) {
+            Some(Status::Success) => Ok(()),
+            Some(Status::KeyNotFound) => Ok(()),
+            Some(status) => return Err(BMemcachedError::Status(status)),
+            None => return Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
+        }
     }
 }
+#[cfg(test)]
+mod tests {
+    extern crate env_logger;
+    use errors::BMemcachedError;
+    use super::*;
 
-#[test]
-fn test_get_key() {
-    let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-    let key = "Hello";
-    let value = "World";
-    p.set(key, value, 100).unwrap();
-    assert_eq!(p.get(key).unwrap(),  value);
-    match p.get("not found".to_string()) {
-        Ok(_) => panic!("This key should not exist"),
-        Err(BMemcachedError::Status(Status::KeyNotFound)) => return,
-        Err(_) => panic!("This should return KeyNotFound")
+    #[test]
+    fn set_key() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = "World";
+        p.set(key, value, 100).unwrap();
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn add_key() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello Add";
+        let value = "World";
+        p.add(key, value, 10).unwrap();
+        let result = p.add(key, value, 10);
+        match result {
+            Ok(()) => panic!("Add key should return error"),
+            Err(BMemcachedError::Status(Status::KeyExists)) => {},
+            Err(_) => panic!("Some strange error that should not happen")
+        };
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn get_key() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = "World";
+        p.set(key, value, 100).unwrap();
+        assert_eq!(p.get(key).unwrap(),  value);
+        match p.get("not found".to_string()) {
+            Ok(_) => panic!("This key should not exist"),
+            Err(BMemcachedError::Status(Status::KeyNotFound)) => {},
+            Err(_) => panic!("This should return KeyNotFound")
+        };
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn delete_key() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = "World";
+        p.set(key, value, 100).unwrap();
+        p.delete(key).unwrap();
+        p.delete(key).unwrap();
     }
 }

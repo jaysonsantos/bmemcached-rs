@@ -41,35 +41,47 @@ impl MemcachedClient {
 
     fn set<K, V>(&self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
         where K: AsRef<[u8]>, V: AsRef<[u8]> {
-        let mut clonable_protocol = self.connections.get(key.as_ref()).unwrap();
+        let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
         let mut protocol = clonable_protocol.connection.lock().unwrap();
         protocol.set(key, value, time)
     }
 
     fn get<K>(&self, key: K) -> Result<String, errors::BMemcachedError> where K: AsRef<[u8]> {
-        let mut clonable_protocol = self.connections.get(key.as_ref()).unwrap();
+        let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
         let mut protocol = clonable_protocol.connection.lock().unwrap();
         protocol.get(key)
+    }
+
+    fn delete<K>(&self, key: K) -> Result<(), errors::BMemcachedError> where K: AsRef<[u8]> {
+        let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
+        let mut protocol = clonable_protocol.connection.lock().unwrap();
+        protocol.delete(key)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    extern crate env_logger;
+
     use std::sync::Arc;
     use std::thread;
     use super::*;
 
     #[test]
     fn test_multiple_threads() {
+        let _ = env_logger::init();
         let mut threads = vec![];
-        for i in 0..3 {
-            let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211"]).unwrap());
+        let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211"]).unwrap());
+        for i in 0..4 {
+            let client = client.clone();
+            debug!("Starting thread {}", i);
             threads.push(thread::spawn(move || {
-                debug!("Ae");
-                let client = client.clone();
+                debug!("Started {}", i);
                 let data = format!("data_n{}", i);
-                client.set(&data, &data, 100);
+                client.set(&data, &data, 100).unwrap();
                 let val = client.get(&data).unwrap();
+                client.delete(&data).unwrap();
+                debug!("Finished {}", i);
                 val
             }));
         }

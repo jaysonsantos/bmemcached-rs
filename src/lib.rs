@@ -1,4 +1,3 @@
-extern crate env_logger;
 extern crate byteorder;
 extern crate conhash;
 #[macro_use] extern crate enum_primitive;
