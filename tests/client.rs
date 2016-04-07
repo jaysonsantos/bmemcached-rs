@@ -15,7 +15,7 @@ use bmemcached::errors::BMemcachedError;
 fn multiple_threads() {
     let _ = env_logger::init();
     let mut threads = vec![];
-    let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211"]).unwrap());
+    let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211"], 5).unwrap());
     for i in 0..4 {
         let client = client.clone();
         debug!("Starting thread {}", i);
@@ -38,8 +38,8 @@ fn multiple_threads() {
 #[test]
 fn get_set_delete() {
     let _ = env_logger::init();
-    let client = MemcachedClient::new(vec!["127.0.0.1:11211"]).unwrap();
-    let key = "Hello Add Client";
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello Get, Set, Delete Client";
     let value = "World";
     client.set(key, value, 1000).unwrap();
     assert_eq!(client.get(key).unwrap(), value);
@@ -49,7 +49,7 @@ fn get_set_delete() {
 #[test]
 fn add() {
     let _ = env_logger::init();
-    let client = MemcachedClient::new(vec!["127.0.0.1:11211"]).unwrap();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello Add Client";
     let value = "World";
     client.add(key, value, 1000).unwrap();
@@ -64,7 +64,7 @@ fn add() {
 #[test]
 fn replace() {
     let _ = env_logger::init();
-    let client = MemcachedClient::new(vec!["127.0.0.1:11211"]).unwrap();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello Replace Client";
     let value = "World";
     client.add(key, value, 1000).unwrap();

@@ -30,11 +30,13 @@ pub struct MemcachedClient {
 }
 
 impl MemcachedClient {
-    pub fn new<A: ToSocketAddrs>(addrs: Vec<A>) -> Result<MemcachedClient, errors::BMemcachedError> {
+    pub fn new<A: ToSocketAddrs>(addrs: Vec<A>, connections_per_addr: u8) -> Result<MemcachedClient, errors::BMemcachedError> {
         let mut ch = ConsistentHash::new();
         for addr in addrs.iter() {
-            let protocol = try!(protocol::Protocol::connect(addr));
-            ch.add(&ClonableProtocol {connection: Arc::new(Mutex::new(protocol))}, 1);
+            for i in 0..connections_per_addr {
+                let protocol = try!(protocol::Protocol::connect(addr));
+                ch.add(&ClonableProtocol {connection: Arc::new(Mutex::new(protocol))}, 1);
+            }
         }
         Ok(MemcachedClient {connections: ch})
     }
