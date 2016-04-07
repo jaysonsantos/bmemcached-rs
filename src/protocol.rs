@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+use std::mem::size_of;
 use std::net::{
     TcpStream,
     ToSocketAddrs
@@ -21,8 +22,8 @@ enum Command {
     Add = 0x02,
     Replace = 0x03,
     Delete = 0x04,
-    // Increment = 0x05,
-    // Decrement = 0x06,
+    Increment = 0x05,
+    Decrement = 0x06,
     // Quit = 0x07,
     // Flush = 0x08,
     // GetQ = 0x09,
@@ -233,6 +234,35 @@ impl Protocol {
             None => Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
         }
     }
+
+    fn increment_decrement<K>(&mut self, key: K, amount: u64, initial: u64, time: u32, command: Command) -> Result<u64, BMemcachedError> where K: AsRef<[u8]> {
+        let key = key.as_ref();
+        let extras_length = 20; // Amount: u64, Initial: u64, Time: u32
+        let request = Protocol::build_request(command, key.len(), 0, 0, extras_length, 0x00);
+        let mut final_payload: Vec<u8> = vec!();
+        try!(final_payload.write_u64::<BigEndian>(amount));
+        try!(final_payload.write_u64::<BigEndian>(initial));
+        try!(final_payload.write_u32::<BigEndian>(time));
+        try!(final_payload.write(key));
+        try!(self.write_request(request, &mut final_payload));
+        let response = try!(self.read_response());
+        match Status::from_u16(response.status) {
+            Some(Status::Success) => Ok(try!(self.connection.read_u64::<BigEndian>())),
+            Some(status) => {
+                try!(self.consume_body(response.body_length));
+                Err(BMemcachedError::Status(status))
+            }
+            None => Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
+        }
+    }
+
+    pub fn increment<K>(&mut self, key: K, amount: u64, initial: u64, time: u32) -> Result<u64, BMemcachedError> where K: AsRef<[u8]> {
+        self.increment_decrement(key, amount, initial, time, Command::Increment)
+    }
+
+    pub fn decrement<K>(&mut self, key: K, amount: u64, initial: u64, time: u32) -> Result<u64, BMemcachedError> where K: AsRef<[u8]> {
+        self.increment_decrement(key, amount, initial, time, Command::Decrement)
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -290,6 +320,30 @@ mod tests {
         let value = "World";
         p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn increment() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello Increment";
+        assert_eq!(p.increment(key, 1, 0, 1000).unwrap(), 0);
+        assert_eq!(p.increment(key, 1, 0, 1000).unwrap(), 1);
+        assert_eq!(p.increment(key, 1, 0, 1000).unwrap(), 2);
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn decrement() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello Decrement";
+        assert_eq!(p.decrement(key, 1, 0, 1000).unwrap(), 0);
+        assert_eq!(p.decrement(key, 1, 0, 1000).unwrap(), 0);
+        assert_eq!(p.increment(key, 1, 0, 1000).unwrap(), 1);
+        assert_eq!(p.increment(key, 1, 0, 1000).unwrap(), 2);
+        assert_eq!(p.decrement(key, 1, 0, 1000).unwrap(), 1);
         p.delete(key).unwrap();
     }
 }

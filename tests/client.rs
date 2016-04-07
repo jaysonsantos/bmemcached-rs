@@ -73,3 +73,25 @@ fn replace() {
     assert_eq!(client.get(key).unwrap(), "New value");
     client.delete(key).unwrap();
 }
+
+
+#[test]
+fn increment() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello Increment Client";
+    assert_eq!(client.increment(key, 1, 0, 1000).unwrap(), 0);
+    assert_eq!(client.increment(key, 1, 1, 1000).unwrap(), 1);
+    client.delete(key).unwrap();
+}
+
+
+#[test]
+fn decrement() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello Decrement Client";
+    assert_eq!(client.decrement(key, 1, 10, 1000).unwrap(), 10);
+    assert_eq!(client.decrement(key, 1, 1, 1000).unwrap(), 9);
+    client.delete(key).unwrap();
+}

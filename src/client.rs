@@ -33,7 +33,7 @@ impl MemcachedClient {
     pub fn new<A: ToSocketAddrs>(addrs: Vec<A>, connections_per_addr: u8) -> Result<MemcachedClient, errors::BMemcachedError> {
         let mut ch = ConsistentHash::new();
         for addr in addrs.iter() {
-            for i in 0..connections_per_addr {
+            for _ in 0..connections_per_addr {
                 let protocol = try!(protocol::Protocol::connect(addr));
                 ch.add(&ClonableProtocol {connection: Arc::new(Mutex::new(protocol))}, 1);
             }
@@ -72,5 +72,17 @@ impl MemcachedClient {
         let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
         let mut protocol = clonable_protocol.connection.lock().unwrap();
         protocol.delete(key)
+    }
+
+    pub fn increment<K>(&self, key: K, amount: u64, initial: u64, time: u32) -> Result<u64, errors::BMemcachedError> where K: AsRef<[u8]> {
+        let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
+        let mut protocol = clonable_protocol.connection.lock().unwrap();
+        protocol.increment(key, amount, initial, time)
+    }
+
+    pub fn decrement<K>(&self, key: K, amount: u64, initial: u64, time: u32) -> Result<u64, errors::BMemcachedError> where K: AsRef<[u8]> {
+        let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
+        let mut protocol = clonable_protocol.connection.lock().unwrap();
+        protocol.decrement(key, amount, initial, time)
     }
 }
