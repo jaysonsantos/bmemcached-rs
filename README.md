@@ -10,5 +10,7 @@ I am trying to learn rust by reimplementing a python project that I wrote.
 * Replace
 * Get
 * Delete
+* Increment
+* Decrement
 * Consistent Hashing
-* Theading Support
+* Threading Support
