@@ -244,7 +244,7 @@ mod tests {
     fn set_key() {
         let _ = env_logger::init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-        let key = "Hello";
+        let key = "Hello Set";
         let value = "World";
         p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
@@ -270,7 +270,7 @@ mod tests {
     fn get_key() {
         let _ = env_logger::init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-        let key = "Hello";
+        let key = "Hello Get";
         let value = "World";
         p.set(key, value, 10000).unwrap();
         assert_eq!(p.get(key).unwrap(),  value);
@@ -286,7 +286,7 @@ mod tests {
     fn delete_key() {
         let _ = env_logger::init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
-        let key = "Hello";
+        let key = "Hello Delete";
         let value = "World";
         p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
