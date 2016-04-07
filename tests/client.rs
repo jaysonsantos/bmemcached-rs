@@ -5,10 +5,14 @@ extern crate bmemcached;
 use std::sync::Arc;
 use std::thread;
 
-use bmemcached::client::MemcachedClient;
+use bmemcached::{
+    MemcachedClient,
+    Status
+};
+use bmemcached::errors::BMemcachedError;
 
 #[test]
-fn test_multiple_threads() {
+fn multiple_threads() {
     let _ = env_logger::init();
     let mut threads = vec![];
     let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211", "127.0.0.1:11211"]).unwrap());
@@ -29,4 +33,43 @@ fn test_multiple_threads() {
         let result = thread.join();
         assert_eq!(result.unwrap(), format!("data_n{}", i));
     }
+}
+
+#[test]
+fn get_set_delete() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"]).unwrap();
+    let key = "Hello Add Client";
+    let value = "World";
+    client.set(key, value, 1000).unwrap();
+    assert_eq!(client.get(key).unwrap(), value);
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn add() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"]).unwrap();
+    let key = "Hello Add Client";
+    let value = "World";
+    client.add(key, value, 1000).unwrap();
+    assert_eq!(client.get(key).unwrap(), value);
+    match client.add(key, value, 1000) {
+        Err(BMemcachedError::Status(Status::KeyExists)) => (),
+        e => panic!("Wrong status returned {:?}", e)
+    }
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn replace() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"]).unwrap();
+    let key = "Hello Replace Client";
+    let value = "World";
+    client.add(key, value, 1000).unwrap();
+    assert_eq!(client.get(key).unwrap(), value);
+    client.replace(key, "New value", 100).unwrap();
+    assert_eq!(client.get(key).unwrap(), "New value");
+    client.delete(key).unwrap();
 }

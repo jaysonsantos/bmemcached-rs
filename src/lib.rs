@@ -4,6 +4,9 @@ extern crate conhash;
 #[macro_use] extern crate log;
 extern crate num;
 
-pub mod client;
+mod client;
 pub mod errors;
 mod protocol;
+
+pub use protocol::Status;
+pub use client::MemcachedClient;
