@@ -1,6 +1,5 @@
 use std::io;
 use std::string;
-use std::sync;
 
 use protocol::Status;
 

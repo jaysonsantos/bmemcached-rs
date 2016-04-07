@@ -1,5 +1,4 @@
 use std::io::{Read, Write};
-use std::mem::size_of;
 use std::net::{
     TcpStream,
     ToSocketAddrs
