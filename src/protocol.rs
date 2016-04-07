@@ -6,7 +6,6 @@ use std::net::{
 };
 
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
-use conhash::Node;
 use num::FromPrimitive;
 
 use errors::BMemcachedError;
@@ -23,28 +22,28 @@ enum Command {
     Add = 0x02,
     Replace = 0x03,
     Delete = 0x04,
-    Increment = 0x05,
-    Decrement = 0x06,
-    Quit = 0x07,
-    Flush = 0x08,
-    GetQ = 0x09,
-    NoOp = 0x0A,
-    Version = 0x0B,
-    GetK = 0x0C,
-    GetKQ = 0x0D,
-    Append = 0x0E,
-    Prepend = 0x0F,
-    Stat = 0x10,
-    SetQ = 0x11,
-    AddQ = 0x12,
-    ReplaceQ = 0x13,
-    DeleteQ = 0x14,
-    IncrementQ = 0x15,
-    DecrementQ = 0x16,
-    QuitQ = 0x17,
-    FlushQ = 0x18,
-    AppendQ = 0x19,
-    PrependQ = 0x1A
+    // Increment = 0x05,
+    // Decrement = 0x06,
+    // Quit = 0x07,
+    // Flush = 0x08,
+    // GetQ = 0x09,
+    // NoOp = 0x0A,
+    // Version = 0x0B,
+    // GetK = 0x0C,
+    // GetKQ = 0x0D,
+    // Append = 0x0E,
+    // Prepend = 0x0F,
+    // Stat = 0x10,
+    // SetQ = 0x11,
+    // AddQ = 0x12,
+    // ReplaceQ = 0x13,
+    // DeleteQ = 0x14,
+    // IncrementQ = 0x15,
+    // DecrementQ = 0x16,
+    // QuitQ = 0x17,
+    // FlushQ = 0x18,
+    // AppendQ = 0x19,
+    // PrependQ = 0x1A
 }
 
 
@@ -83,11 +82,6 @@ pub struct Response {
     body_length: u32,
     opaque: u32,
     cas: u64
-}
-
-pub struct SetAddReplace {
-    flags: u32,
-    expiration: u32
 }
 
 #[derive(Debug)]
@@ -152,19 +146,20 @@ impl Protocol {
         })
     }
 
-    fn consume_body(&mut self, size: u32) {
+    fn consume_body(&mut self, size: u32) -> Result<(), BMemcachedError> {
         debug!("Consuming body");
         let mut buf: Vec<u8> = vec![0; size as usize];
-        self.connection.read(&mut *buf);
-        let str_buf = String::from_utf8(buf).unwrap();
+        try!(self.connection.read(&mut *buf));
+        let str_buf = try!(String::from_utf8(buf));
         debug!("Consumed body {:?}", str_buf);
+        Ok(())
     }
 
     fn set_add_replace<K, V>(&mut self, command: Command, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
         where K: AsRef<[u8]>, V: AsRef<[u8]> {
         let key = key.as_ref();
         let value = value.as_ref();
-        let extras_length = size_of::<SetAddReplace>();
+        let extras_length = 8; // Flags: u32 and Expiration time: u32
         let request = Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00);
         let mut final_payload = vec![];
         // Flags
@@ -173,12 +168,12 @@ impl Protocol {
         // After flags key and value
         try!(final_payload.write(key));
         try!(final_payload.write(value));
-        let size = try!(self.write_request(request, final_payload.as_slice()));
+        try!(self.write_request(request, final_payload.as_slice()));
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
             Some(Status::Success) => Ok(()),
             Some(rest) => {
-                self.consume_body(response.body_length);
+                try!(self.consume_body(response.body_length));
                 Err(BMemcachedError::Status(rest))
             },
             None => Err(BMemcachedError::UnkownError("Server returned an unknown status code"))
@@ -203,12 +198,12 @@ impl Protocol {
     pub fn get<K>(&mut self, key: K) -> Result<String, BMemcachedError> where K: AsRef<[u8]> {
         let key = key.as_ref();
         let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
-        self.write_request(request, key);
+        try!(self.write_request(request, key));
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
             Some(Status::Success) => {},
             Some(status) => {
-                self.consume_body(response.body_length);
+                try!(self.consume_body(response.body_length));
                 return Err(BMemcachedError::Status(status))
             },
             None => return Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
@@ -223,17 +218,17 @@ impl Protocol {
     pub fn delete<K>(&mut self, key: K) -> Result<(), BMemcachedError> where K: AsRef<[u8]> {
         let key = key.as_ref();
         let request = Protocol::build_request(Command::Delete, key.len(), 0 as usize, 0, 0, 0x00);
-        self.write_request(request, key);
+        try!(self.write_request(request, key));
         let response = try!(self.read_response());
 
         match Status::from_u16(response.status) {
             Some(Status::Success) => Ok(()),
             Some(Status::KeyNotFound) => {
-                self.consume_body(response.body_length);
+                try!(self.consume_body(response.body_length));
                 Ok(())
             },
             Some(status) => {
-                self.consume_body(response.body_length);
+                try!(self.consume_body(response.body_length));
                 Err(BMemcachedError::Status(status))
             },
             None => Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
@@ -269,7 +264,7 @@ mod tests {
             Err(BMemcachedError::Status(Status::KeyExists)) => {},
             Err(_) => panic!("Some strange error that should not happen")
         };
-        p.delete(key);
+        p.delete(key).unwrap();
     }
 
     #[test]
@@ -278,7 +273,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = "World";
-        p.set(key, value, 1000).unwrap();
+        p.set(key, value, 10000).unwrap();
         assert_eq!(p.get(key).unwrap(),  value);
         match p.get("not found".to_string()) {
             Ok(_) => panic!("This key should not exist"),
