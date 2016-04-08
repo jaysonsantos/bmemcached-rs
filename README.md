@@ -5,10 +5,10 @@ Rust binary memcached implementation (ON GOING)
 I am trying to learn rust by reimplementing a python project that I wrote.
 
 # What works
-* Add
-* Set
-* Replace
-* Get
+* Add (Strings only)
+* Set (Strings only)
+* Replace (Strings only)
+* Get (Strings only)
 * Delete
 * Increment
 * Decrement
