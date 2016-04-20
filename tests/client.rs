@@ -47,6 +47,46 @@ fn get_set_delete() {
 }
 
 #[test]
+fn get_set_u8() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello u8";
+    let value = 1 as u8;
+    client.set(key, value, 1000).unwrap();
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn get_set_u16() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello u16";
+    let value = 1 as u16;
+    client.set(key, value, 1000).unwrap();
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn get_set_u32() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello u32";
+    let value = 1 as u32;
+    client.set(key, value, 1000).unwrap();
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn get_set_u64() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello u64";
+    let value = 1 as u64;
+    client.set(key, value, 1000).unwrap();
+    client.delete(key).unwrap();
+}
+
+#[test]
 fn add() {
     let _ = env_logger::init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();

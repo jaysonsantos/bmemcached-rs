@@ -49,14 +49,14 @@ impl MemcachedClient {
     }
 
     pub fn add<K, V>(&self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
-        where K: AsRef<[u8]>, V: AsRef<[u8]> {
+        where K: AsRef<[u8]>, V: protocol::ToMemcached {
         let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
         let mut protocol = clonable_protocol.connection.lock().unwrap();
         protocol.add(key, value, time)
     }
 
     pub fn replace<K, V>(&self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
-        where K: AsRef<[u8]>, V: AsRef<[u8]> {
+        where K: AsRef<[u8]>, V: protocol::ToMemcached {
         let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
         let mut protocol = clonable_protocol.connection.lock().unwrap();
         protocol.replace(key, value, time)
