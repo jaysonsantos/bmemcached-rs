@@ -88,6 +88,10 @@ pub struct Protocol {
     connection: TcpStream
 }
 
+pub trait ToMemcached {
+    fn get_value(&self) -> Result<Vec<u8>, BMemcachedError>;
+}
+
 impl Protocol {
     pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Protocol, BMemcachedError> {
         Ok(Protocol{connection: try!(TcpStream::connect(addr))})
@@ -109,7 +113,8 @@ impl Protocol {
         }
     }
 
-    fn write_request(&self, request: Request, final_payload: &[u8]) -> Result<(), BMemcachedError> {
+    fn write_request(&self, request: Request, final_payload: &[u8])
+                     -> Result<(), BMemcachedError> {
         let mut buf = &self.connection;
         try!(buf.write_u8(request.magic));
         try!(buf.write_u8(request.opcode));
@@ -154,12 +159,15 @@ impl Protocol {
         Ok(())
     }
 
-    fn set_add_replace<K, V>(&mut self, command: Command, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+    fn set_add_replace<K, V>(&mut self, command: Command, key: K, value: V, time: u32)
+                             -> Result<(), BMemcachedError>
         where K: AsRef<[u8]>, V: AsRef<[u8]> {
         let key = key.as_ref();
         let value = value.as_ref();
+
         let extras_length = 8; // Flags: u32 and Expiration time: u32
-        let request = Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00);
+        let request = Protocol::build_request(command, key.len(), value.len(), 0x00,
+            extras_length, 0x00);
         let mut final_payload = vec![];
         // Flags
         try!(final_payload.write_u32::<BigEndian>(0));
@@ -175,29 +183,31 @@ impl Protocol {
                 try!(self.consume_body(response.body_length));
                 Err(BMemcachedError::Status(rest))
             },
-            None => Err(BMemcachedError::UnkownError("Server returned an unknown status code"))
+            None => Err(BMemcachedError::UnkownError(
+                "Server returned an unknown status code"))
         }
     }
 
     pub fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
-        where K: AsRef<[u8]>, V: AsRef<[u8]> {
-        self.set_add_replace(Command::Set, key, value, time)
+        where K: AsRef<[u8]>, V: ToMemcached {
+            self.set_add_replace(Command::Set, key, try!(value.get_value()), time)
     }
 
     pub fn add<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
-        where K: AsRef<[u8]>, V: AsRef<[u8]> {
-        self.set_add_replace(Command::Add, key, value, time)
+        where K: AsRef<[u8]>, V: ToMemcached {
+        self.set_add_replace(Command::Add, key, try!(value.get_value()), time)
     }
 
-    pub fn replace<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
-        where K: AsRef<[u8]>, V: AsRef<[u8]> {
-        self.set_add_replace(Command::Replace, key, value, time)
+    pub fn replace<K, V>(&mut self, key: K, value: V, time: u32)
+                         -> Result<(), BMemcachedError> where K: AsRef<[u8]>, V: ToMemcached {
+        self.set_add_replace(Command::Replace, key, try!(value.get_value()), time)
     }
 
     pub fn get<K>(&mut self, key: K) -> Result<String, BMemcachedError> where K: AsRef<[u8]> {
         let key = key.as_ref();
-        let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
-        try!(self.write_request(request, key));
+        let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0,
+                                              0x00);
+        self.write_request(request, key);
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
             Some(Status::Success) => {},
@@ -205,11 +215,13 @@ impl Protocol {
                 try!(self.consume_body(response.body_length));
                 return Err(BMemcachedError::Status(status))
             },
-            None => return Err(BMemcachedError::UnkownError("Server sent an unknown status code"))
+            None => return Err(BMemcachedError::UnkownError(
+                "Server sent an unknown status code"))
         };
         // Discard extras for now
         try!(self.connection.read_u32::<BigEndian>());
-        let mut outbuf = vec![0; (response.body_length - response.extras_length as u32) as usize];
+        let mut outbuf = vec![0; (response.body_length - response.extras_length as u32)
+                              as usize];
         try!(self.connection.read_exact(&mut outbuf));
         Ok(try!(String::from_utf8(outbuf)))
     }
@@ -263,6 +275,50 @@ impl Protocol {
         self.increment_decrement(key, amount, initial, time, Command::Decrement)
     }
 }
+
+impl ToMemcached for u8 {
+    fn get_value(&self) -> Result<Vec<u8>, BMemcachedError> {
+        Ok(vec!(*self))
+    }
+}
+
+impl ToMemcached for u16 {
+    fn get_value(&self) -> Result<Vec<u8>, BMemcachedError> {
+        let mut buf = vec![];
+        try!(buf.write_u16::<BigEndian>(*self));
+        Ok(buf)
+    }
+}
+
+impl ToMemcached for u32 {
+    fn get_value(&self) -> Result<Vec<u8>, BMemcachedError> {
+        let mut buf = vec![];
+        try!(buf.write_u32::<BigEndian>(*self));
+        Ok(buf)
+    }
+}
+
+impl ToMemcached for u64 {
+    fn get_value(&self) -> Result<Vec<u8>, BMemcachedError> {
+        let mut buf = vec![];
+        try!(buf.write_u64::<BigEndian>(*self));
+        Ok(buf)
+    }
+}
+
+impl<'a> ToMemcached for &'a String {
+    fn get_value(&self) -> Result<Vec<u8>, BMemcachedError> {
+        let v = *self;
+        Ok(v.clone().into_bytes())
+    }
+}
+
+impl<'a> ToMemcached for &'a str {
+    fn get_value(&self) -> Result<Vec<u8>, BMemcachedError> {
+        Ok(self.as_bytes().to_vec())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     extern crate env_logger;
@@ -275,7 +331,42 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Set";
         let value = "World";
-        p.set(key, value, 1000).unwrap();
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn set_key_u8() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = 1 as u8;
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn set_key_u16() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = 1 as u16;
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn set_key_u32() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = 1 as u32;
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn set_key_u64() {
+        let _ = env_logger::init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = 1 as u64;
         p.delete(key).unwrap();
     }
 

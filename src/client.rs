@@ -42,7 +42,7 @@ impl MemcachedClient {
     }
 
     pub fn set<K, V>(&self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
-        where K: AsRef<[u8]>, V: AsRef<[u8]> {
+        where K: AsRef<[u8]>, V: protocol::ToMemcached {
         let clonable_protocol = self.connections.get(key.as_ref()).unwrap();
         let mut protocol = clonable_protocol.connection.lock().unwrap();
         protocol.set(key, value, time)
