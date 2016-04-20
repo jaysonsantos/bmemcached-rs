@@ -159,9 +159,15 @@ impl Protocol {
         Ok(())
     }
 
-    fn set_add_replace<K, V>(&mut self, command: Command, key: K, value: V, time: u32)
+    fn set_add_replace<K, V>(&mut self,
+                             command: Command,
+                             key: K,
+                             value: V,
+                             time: u32)
                              -> Result<(), BMemcachedError>
-        where K: AsRef<[u8]>, V: AsRef<[u8]> {
+        where K: AsRef<[u8]>,
+              V: AsRef<[u8]>
+    {
         let key = key.as_ref();
         let value = value.as_ref();
 
@@ -190,11 +196,13 @@ impl Protocol {
 
     pub fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
         where K: AsRef<[u8]>, V: ToMemcached {
-            self.set_add_replace(Command::Set, key, try!(value.get_value()), time)
+        self.set_add_replace(Command::Set, key, try!(value.get_value()), time)
     }
 
     pub fn add<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
-        where K: AsRef<[u8]>, V: ToMemcached {
+        where K: AsRef<[u8]>,
+              V: ToMemcached
+    {
         self.set_add_replace(Command::Add, key, try!(value.get_value()), time)
     }
 
@@ -207,7 +215,7 @@ impl Protocol {
         let key = key.as_ref();
         let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0,
                                               0x00);
-        self.write_request(request, key);
+        try!(self.write_request(request, key));
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
             Some(Status::Success) => {},
@@ -331,6 +339,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Set";
         let value = "World";
+        p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
     }
 
@@ -340,6 +349,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u8;
+        p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
     }
 
@@ -349,6 +359,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u16;
+        p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
     }
 
@@ -358,6 +369,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u32;
+        p.set(key, value, 100).unwrap();
         p.delete(key).unwrap();
     }
 
@@ -367,6 +379,7 @@ mod tests {
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u64;
+        p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
     }
 
