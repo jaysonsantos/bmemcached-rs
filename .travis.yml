@@ -9,3 +9,5 @@ matrix:
     - rust: nightly
 services:
   - memcached
+env:
+  - RUST_TEST_THREADS=1
