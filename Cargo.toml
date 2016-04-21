@@ -2,13 +2,18 @@
 name = "bmemcached"
 version = "0.1.0"
 authors = ["Jayson Reis <santosdosreis@gmail.com>"]
+description = "Memcached binary protocol in pure rust with support for 'pools' and consistent hashing. (For now minor versions will break API until v1 is released)"
+homepage = "https://github.com/jaysonsantos/bmemcached-rs"
+repository = "https://github.com/jaysonsantos/bmemcached-rs"
+documentation = "https://github.com/jaysonsantos/bmemcached-rs"
+license = "MIT"
 
 [dependencies]
 byteorder = "0.5.1"
 conhash = "0.3.2"
 enum_primitive = "0.1.0"
-log = "*"
+log = "0.3.6"
 num = "0.1.31"
 
 [dev-dependencies]
-env_logger = "*"
+env_logger = "0.3.3"
