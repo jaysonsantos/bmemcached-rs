@@ -5,12 +5,15 @@ Rust binary memcached implementation (ON GOING)
 I am trying to learn rust by reimplementing a python project that I wrote.
 
 # What works
-* Add (Strings only)
-* Set (Strings only)
-* Replace (Strings only)
-* Get (Strings only)
+* Add
+* Set
+* Replace
+* Get
 * Delete
 * Increment
 * Decrement
 * Consistent Hashing
 * Threading Support
+
+## Trait usage
+On all supported functions we use traits to be able to send any type of values to memcached.

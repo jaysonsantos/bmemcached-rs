@@ -9,6 +9,7 @@ documentation = "https://github.com/jaysonsantos/bmemcached-rs"
 license = "MIT"
 
 [dependencies]
+bitflags = "0.6.0"
 byteorder = "0.5.1"
 conhash = "0.3.2"
 enum_primitive = "0.1.0"
