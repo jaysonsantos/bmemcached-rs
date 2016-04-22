@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["MemcachedClient",""]]});
+initSidebarItems({"struct":[["MemcachedClient","Struct that holds all connections and proxy commands to the right server based on the key"]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Status",""]]});
+initSidebarItems({"enum":[["Status",""]],"struct":[["StoredType",""]],"trait":[["FromMemcached",""],["ToMemcached",""]]});
