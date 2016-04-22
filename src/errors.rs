@@ -1,14 +1,17 @@
 use std::io;
 use std::string;
 
-use protocol::Status;
+use protocol::{Status, StoredType};
 
 #[derive(Debug)]
 pub enum BMemcachedError {
     IoError(io::Error),
     Utf8Error(string::FromUtf8Error),
     UnkownError(&'static str),
-    Status(Status)
+    Status(Status),
+    /// In case you tried to coerse to a value that does not match with the stored.
+    /// The returned flags are inside the error.
+    TypeMismatch(StoredType)
 }
 
 impl From<io::Error> for BMemcachedError {

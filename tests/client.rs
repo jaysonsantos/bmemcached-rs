@@ -23,7 +23,7 @@ fn multiple_threads() {
             debug!("Started {}", i);
             let data = format!("data_n{}", i);
             client.set(&data, &data, 100).unwrap();
-            let val = client.get(&data).unwrap();
+            let val: String = client.get(&data).unwrap();
             client.delete(&data).unwrap();
             debug!("Finished {}", i);
             val
@@ -42,7 +42,60 @@ fn get_set_delete() {
     let key = "Hello Get, Set, Delete Client";
     let value = "World";
     client.set(key, value, 1000).unwrap();
-    assert_eq!(client.get(key).unwrap(), value);
+    let rv: String = client.get(key).unwrap();
+    assert_eq!(rv, value);
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn get_set_u8() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello u8";
+    let value = 1 as u8;
+    client.set(key, value, 1000).unwrap();
+
+    let rv: u8 = client.get(key).unwrap();
+    assert_eq!(rv, value);
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn get_set_u16() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello u16";
+    let value = 1 as u16;
+    client.set(key, value, 1000).unwrap();
+
+    let rv: u16 = client.get(key).unwrap();
+    assert_eq!(rv, value);
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn get_set_u32() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello u32";
+    let value = 1 as u32;
+    client.set(key, value, 1000).unwrap();
+
+    let rv: u32 = client.get(key).unwrap();
+    assert_eq!(rv, value);
+    client.delete(key).unwrap();
+}
+
+#[test]
+fn get_set_u64() {
+    let _ = env_logger::init();
+    let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
+    let key = "Hello u64";
+    let value = 1 as u64;
+    client.set(key, value, 1000).unwrap();
+
+    let rv: u64 = client.get(key).unwrap();
+    assert_eq!(rv, value);
     client.delete(key).unwrap();
 }
 
@@ -53,7 +106,8 @@ fn add() {
     let key = "Hello Add Client";
     let value = "World";
     client.add(key, value, 1000).unwrap();
-    assert_eq!(client.get(key).unwrap(), value);
+    let rv: String = client.get(key).unwrap();
+    assert_eq!(rv, value);
     match client.add(key, value, 1000) {
         Err(BMemcachedError::Status(Status::KeyExists)) => (),
         e => panic!("Wrong status returned {:?}", e)
@@ -68,9 +122,13 @@ fn replace() {
     let key = "Hello Replace Client";
     let value = "World";
     client.add(key, value, 1000).unwrap();
-    assert_eq!(client.get(key).unwrap(), value);
+
+    let rv: String = client.get(key).unwrap();
+    assert_eq!(rv, value);
+
     client.replace(key, "New value", 100).unwrap();
-    assert_eq!(client.get(key).unwrap(), "New value");
+    let rv: String = client.get(key).unwrap();
+    assert_eq!(rv, "New value");
     client.delete(key).unwrap();
 }
 
