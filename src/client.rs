@@ -36,7 +36,7 @@ impl MemcachedClient {
                                  -> Result<MemcachedClient, errors::BMemcachedError>
     {
         let mut ch = ConsistentHash::new();
-        for addr in addrs.iter() {
+        for addr in &addrs {
             for _ in 0..connections_per_addr {
                 let protocol = try!(protocol::Protocol::connect(addr));
                 ch.add(&ClonableProtocol {connection: Arc::new(Mutex::new(protocol))}, 1);

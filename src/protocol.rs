@@ -156,7 +156,7 @@ impl Protocol {
     }
 
     pub fn connection_info(&self) -> String {
-        format!("{:?}", self.connection.peer_addr().unwrap())
+        self.connection.peer_addr().unwrap().to_string()
     }
 
     fn build_request(command: Command, key_length: usize, value_length: usize, data_type: u8,
@@ -340,7 +340,7 @@ impl Protocol {
         try!(final_payload.write_u64::<BigEndian>(initial));
         try!(final_payload.write_u32::<BigEndian>(time));
         try!(final_payload.write(key));
-        try!(self.write_request(request, &mut final_payload));
+        try!(self.write_request(request, &final_payload));
         let response = try!(self.read_response());
         match Status::from_u16(response.status) {
             Some(Status::Success) => Ok(try!(self.connection.read_u64::<BigEndian>())),
