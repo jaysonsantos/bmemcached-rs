@@ -1,4 +1,4 @@
-# bmemcached-rs [![Build Status](https://travis-ci.org/jaysonsantos/bmemcached-rs.svg?branch=master)](https://travis-ci.org/jaysonsantos/bmemcached-rs)
+# bmemcached-rs [![Build Status](https://travis-ci.org/jaysonsantos/bmemcached-rs.svg?branch=master)](https://travis-ci.org/jaysonsantos/bmemcached-rs) [![Clippy Linting Result](https://clippy.bashy.io/github/jaysonsantos/bmemcached-rs/master/badge.svg)](https://clippy.bashy.io/github/jaysonsantos/bmemcached-rs/master/log)
 Rust binary memcached implementation (ON GOING)
 
 # Usage
