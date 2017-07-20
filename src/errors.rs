@@ -11,7 +11,7 @@ pub enum BMemcachedError {
     Status(Status),
     /// In case you tried to coerse to a value that does not match with the stored.
     /// The returned flags are inside the error.
-    TypeMismatch(StoredType)
+    TypeMismatch(StoredType),
 }
 
 impl From<io::Error> for BMemcachedError {

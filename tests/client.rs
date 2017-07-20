@@ -1,14 +1,12 @@
 extern crate env_logger;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate bmemcached;
 
 use std::sync::Arc;
 use std::thread;
 
-use bmemcached::{
-    MemcachedClient,
-    Status
-};
+use bmemcached::{MemcachedClient, Status};
 use bmemcached::errors::BMemcachedError;
 
 #[test]
@@ -110,7 +108,7 @@ fn add() {
     assert_eq!(rv, value);
     match client.add(key, value, 1000) {
         Err(BMemcachedError::Status(Status::KeyExists)) => (),
-        e => panic!("Wrong status returned {:?}", e)
+        e => panic!("Wrong status returned {:?}", e),
     }
     client.delete(key).unwrap();
 }
