@@ -1,7 +1,8 @@
 use std::io;
 use std::string;
 
-use protocol::{Status, StoredType};
+use constants::StoredType;
+use protocol::Status;
 
 #[derive(Debug)]
 pub enum BMemcachedError {
