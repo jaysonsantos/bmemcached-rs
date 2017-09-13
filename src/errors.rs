@@ -8,9 +8,9 @@ use protocol::Status;
 pub enum BMemcachedError {
     IoError(io::Error),
     Utf8Error(string::FromUtf8Error),
-    UnkownError(&'static str),
+    UnknownError(&'static str),
     Status(Status),
-    /// In case you tried to coerse to a value that does not match with the stored.
+    /// In case you tried to coerce to a value that does not match with the stored.
     /// The returned flags are inside the error.
     TypeMismatch(StoredType),
 }

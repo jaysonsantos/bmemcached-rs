@@ -1,6 +1,6 @@
 [package]
 name = "bmemcached"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Jayson Reis <santosdosreis@gmail.com>"]
 description = "Memcached binary protocol in pure rust with support for 'pools' and consistent hashing. (For now minor versions will break API until v1 is released)"
 homepage = "https://github.com/jaysonsantos/bmemcached-rs"
