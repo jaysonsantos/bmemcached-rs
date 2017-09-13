@@ -145,7 +145,7 @@ impl Protocol {
         if magic != Type::Response as u8 {
             // TODO Consume the stream, disconnect or something?
             debug!("Server sent an unknown magic code {:?}", magic);
-            return Err(BMemcachedError::UnkownError(
+            return Err(BMemcachedError::UnknownError(
                 "Server sent an unknown magic code",
             ));
         }
@@ -203,7 +203,7 @@ impl Protocol {
                 self.consume_body(response.body_length)?;
                 Err(BMemcachedError::Status(rest))
             }
-            None => Err(BMemcachedError::UnkownError(
+            None => Err(BMemcachedError::UnknownError(
                 "Server returned an unknown status code",
             )),
         }
@@ -249,7 +249,7 @@ impl Protocol {
                 return Err(BMemcachedError::Status(status));
             }
             None => {
-                return Err(BMemcachedError::UnkownError(
+                return Err(BMemcachedError::UnknownError(
                     "Server sent an unknown status code",
                 ));
             }
@@ -279,7 +279,7 @@ impl Protocol {
                 self.consume_body(response.body_length)?;
                 Err(BMemcachedError::Status(status))
             }
-            None => Err(BMemcachedError::UnkownError(
+            None => Err(BMemcachedError::UnknownError(
                 "Server sent an unknown status code",
             )),
         }
@@ -312,7 +312,7 @@ impl Protocol {
                 self.consume_body(response.body_length)?;
                 Err(BMemcachedError::Status(status))
             }
-            None => Err(BMemcachedError::UnkownError(
+            None => Err(BMemcachedError::UnknownError(
                 "Server sent an unknown status code",
             )),
         }
