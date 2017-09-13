@@ -1,0 +1,6 @@
+[clog]
+repository = "https://github.com/jaysonsantos/bmemcached-rs"
+link-style = "github"
+changelog = "CHANGELOG.md"
+output-format = "markdown"
+from-latest-tag = false
