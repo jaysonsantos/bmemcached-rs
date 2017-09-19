@@ -1,28 +1,22 @@
-use std::io;
-use std::string;
-
 use constants::StoredType;
 use protocol::Status;
 
-#[derive(Debug)]
-pub enum BMemcachedError {
-    IoError(io::Error),
-    Utf8Error(string::FromUtf8Error),
-    UnknownError(&'static str),
-    Status(Status),
-    /// In case you tried to coerce to a value that does not match with the stored.
-    /// The returned flags are inside the error.
-    TypeMismatch(StoredType),
-}
-
-impl From<io::Error> for BMemcachedError {
-    fn from(err: io::Error) -> BMemcachedError {
-        BMemcachedError::IoError(err)
+error_chain! {
+    foreign_links {
+        IoError(::std::io::Error);
+        Utf8Error(::std::string::FromUtf8Error);
     }
-}
 
-impl From<string::FromUtf8Error> for BMemcachedError {
-    fn from(err: string::FromUtf8Error) -> BMemcachedError {
-        BMemcachedError::Utf8Error(err)
+    errors {
+        Status(s: Status) {
+            description("Invalid status received")
+            display("Invalid status received {:?}", s)
+        }
+        /// In case you tried to coerce to a value that does not match with the stored.
+        /// The returned flags are inside the error.
+        TypeMismatch(s: StoredType) {
+            description("Requested type is different from the one stored in memcached")
+            display("Requested type is different from the one stored in memcached: {:?}", s)
+        }
     }
 }

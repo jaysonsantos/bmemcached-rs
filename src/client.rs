@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use conhash::{ConsistentHash, Node};
 
-use errors;
+use errors::Result;
 use protocol;
 
 #[derive(Debug, Clone)]
@@ -28,7 +28,7 @@ impl MemcachedClient {
     pub fn new<A: ToSocketAddrs>(
         addrs: Vec<A>,
         connections_per_addr: u8,
-    ) -> Result<MemcachedClient, errors::BMemcachedError> {
+    ) -> Result<MemcachedClient> {
         let mut ch = ConsistentHash::new();
         for addr in &addrs {
             for _ in 0..connections_per_addr {
@@ -42,7 +42,7 @@ impl MemcachedClient {
         Ok(MemcachedClient { connections: ch })
     }
 
-    pub fn set<K, V>(&self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
+    pub fn set<K, V>(&self, key: K, value: V, time: u32) -> Result<()>
     where
         K: AsRef<[u8]>,
         V: protocol::ToMemcached,
@@ -52,7 +52,7 @@ impl MemcachedClient {
         protocol.set(key, value, time)
     }
 
-    pub fn add<K, V>(&self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
+    pub fn add<K, V>(&self, key: K, value: V, time: u32) -> Result<()>
     where
         K: AsRef<[u8]>,
         V: protocol::ToMemcached,
@@ -62,7 +62,7 @@ impl MemcachedClient {
         protocol.add(key, value, time)
     }
 
-    pub fn replace<K, V>(&self, key: K, value: V, time: u32) -> Result<(), errors::BMemcachedError>
+    pub fn replace<K, V>(&self, key: K, value: V, time: u32) -> Result<()>
     where
         K: AsRef<[u8]>,
         V: protocol::ToMemcached,
@@ -72,7 +72,7 @@ impl MemcachedClient {
         protocol.replace(key, value, time)
     }
 
-    pub fn get<K, V>(&self, key: K) -> Result<V, errors::BMemcachedError>
+    pub fn get<K, V>(&self, key: K) -> Result<V>
     where
         K: AsRef<[u8]>,
         V: protocol::FromMemcached,
@@ -82,7 +82,7 @@ impl MemcachedClient {
         protocol.get(key)
     }
 
-    pub fn delete<K>(&self, key: K) -> Result<(), errors::BMemcachedError>
+    pub fn delete<K>(&self, key: K) -> Result<()>
     where
         K: AsRef<[u8]>,
     {
@@ -97,7 +97,7 @@ impl MemcachedClient {
         amount: u64,
         initial: u64,
         time: u32,
-    ) -> Result<u64, errors::BMemcachedError>
+    ) -> Result<u64>
     where
         K: AsRef<[u8]>,
     {
@@ -112,7 +112,7 @@ impl MemcachedClient {
         amount: u64,
         initial: u64,
         time: u32,
-    ) -> Result<u64, errors::BMemcachedError>
+    ) -> Result<u64>
     where
         K: AsRef<[u8]>,
     {

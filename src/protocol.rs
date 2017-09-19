@@ -5,7 +5,7 @@ use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use num::FromPrimitive;
 
 use constants::*;
-use errors::BMemcachedError;
+use errors::{Result, ErrorKind};
 
 enum Type {
     Request = 0x80,
@@ -87,15 +87,15 @@ pub struct Protocol {
 }
 
 pub trait ToMemcached {
-    fn get_value(&self) -> Result<(Vec<u8>, StoredType), BMemcachedError>;
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)>;
 }
 
 pub trait FromMemcached: Sized {
-    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self, BMemcachedError>;
+    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self>;
 }
 
 impl Protocol {
-    pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Protocol, BMemcachedError> {
+    pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Protocol> {
         Ok(Protocol { connection: TcpStream::connect(addr)? })
     }
 
@@ -124,7 +124,7 @@ impl Protocol {
         }
     }
 
-    fn write_request(&self, request: Request, final_payload: &[u8]) -> Result<(), BMemcachedError> {
+    fn write_request(&self, request: Request, final_payload: &[u8]) -> Result<()> {
         let mut buf = &self.connection;
         buf.write_u8(request.magic)?;
         buf.write_u8(request.opcode)?;
@@ -139,15 +139,13 @@ impl Protocol {
         Ok(())
     }
 
-    fn read_response(&mut self) -> Result<Response, BMemcachedError> {
+    fn read_response(&mut self) -> Result<Response> {
         let mut buf = &self.connection;
         let magic: u8 = buf.read_u8()?;
         if magic != Type::Response as u8 {
             // TODO Consume the stream, disconnect or something?
             debug!("Server sent an unknown magic code {:?}", magic);
-            return Err(BMemcachedError::UnknownError(
-                "Server sent an unknown magic code",
-            ));
+            bail!("Server sent an unknown magic code");
         }
         Ok(Response {
             magic,
@@ -162,7 +160,7 @@ impl Protocol {
         })
     }
 
-    fn consume_body(&mut self, size: u32) -> Result<(), BMemcachedError> {
+    fn consume_body(&mut self, size: u32) -> Result<()> {
         debug!("Consuming body");
         let mut buf: Vec<u8> = vec![0; size as usize];
         self.connection.read(&mut *buf)?;
@@ -177,7 +175,7 @@ impl Protocol {
         key: K,
         value: V,
         time: u32,
-    ) -> Result<(), BMemcachedError>
+    ) -> Result<()>
         where
             K: AsRef<[u8]>,
             V: ToMemcached,
@@ -201,15 +199,13 @@ impl Protocol {
             Some(Status::Success) => Ok(()),
             Some(rest) => {
                 self.consume_body(response.body_length)?;
-                Err(BMemcachedError::Status(rest))
+                bail!(ErrorKind::Status(rest))
             }
-            None => Err(BMemcachedError::UnknownError(
-                "Server returned an unknown status code",
-            )),
+            None => bail!("Server returned an unknown status code"),
         }
     }
 
-    pub fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+    pub fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<()>
         where
             K: AsRef<[u8]>,
             V: ToMemcached,
@@ -217,7 +213,7 @@ impl Protocol {
         self.set_add_replace(Command::Set, key, value, time)
     }
 
-    pub fn add<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+    pub fn add<K, V>(&mut self, key: K, value: V, time: u32) -> Result<()>
         where
             K: AsRef<[u8]>,
             V: ToMemcached,
@@ -225,7 +221,7 @@ impl Protocol {
         self.set_add_replace(Command::Add, key, value, time)
     }
 
-    pub fn replace<K, V>(&mut self, key: K, value: V, time: u32) -> Result<(), BMemcachedError>
+    pub fn replace<K, V>(&mut self, key: K, value: V, time: u32) -> Result<()>
         where
             K: AsRef<[u8]>,
             V: ToMemcached,
@@ -233,7 +229,7 @@ impl Protocol {
         self.set_add_replace(Command::Replace, key, value, time)
     }
 
-    pub fn get<K, V>(&mut self, key: K) -> Result<V, BMemcachedError>
+    pub fn get<K, V>(&mut self, key: K) -> Result<V>
         where
             K: AsRef<[u8]>,
             V: FromMemcached,
@@ -246,12 +242,10 @@ impl Protocol {
             Some(Status::Success) => {}
             Some(status) => {
                 self.consume_body(response.body_length)?;
-                return Err(BMemcachedError::Status(status));
+                bail!(ErrorKind::Status(status));
             }
             None => {
-                return Err(BMemcachedError::UnknownError(
-                    "Server sent an unknown status code",
-                ));
+                bail!("Server sent an unknown status code");
             }
         };
         let flags = StoredType::from_bits(self.connection.read_u32::<BigEndian>()?).unwrap();
@@ -260,7 +254,7 @@ impl Protocol {
         FromMemcached::get_value(flags, outbuf)
     }
 
-    pub fn delete<K>(&mut self, key: K) -> Result<(), BMemcachedError>
+    pub fn delete<K>(&mut self, key: K) -> Result<()>
         where
             K: AsRef<[u8]>,
     {
@@ -277,11 +271,9 @@ impl Protocol {
             }
             Some(status) => {
                 self.consume_body(response.body_length)?;
-                Err(BMemcachedError::Status(status))
+                bail!(ErrorKind::Status(status))
             }
-            None => Err(BMemcachedError::UnknownError(
-                "Server sent an unknown status code",
-            )),
+            None => bail!("Server sent an unknown status code"),
         }
     }
 
@@ -292,7 +284,7 @@ impl Protocol {
         initial: u64,
         time: u32,
         command: Command,
-    ) -> Result<u64, BMemcachedError>
+    ) -> Result<u64>
         where
             K: AsRef<[u8]>,
     {
@@ -310,11 +302,9 @@ impl Protocol {
             Some(Status::Success) => Ok(self.connection.read_u64::<BigEndian>()?),
             Some(status) => {
                 self.consume_body(response.body_length)?;
-                Err(BMemcachedError::Status(status))
+                bail!(ErrorKind::Status(status))
             }
-            None => Err(BMemcachedError::UnknownError(
-                "Server sent an unknown status code",
-            )),
+            None => bail!("Server sent an unknown status code"),
         }
     }
 
@@ -324,7 +314,7 @@ impl Protocol {
         amount: u64,
         initial: u64,
         time: u32,
-    ) -> Result<u64, BMemcachedError>
+    ) -> Result<u64>
         where
             K: AsRef<[u8]>,
     {
@@ -337,7 +327,7 @@ impl Protocol {
         amount: u64,
         initial: u64,
         time: u32,
-    ) -> Result<u64, BMemcachedError>
+    ) -> Result<u64>
         where
             K: AsRef<[u8]>,
     {
@@ -346,13 +336,13 @@ impl Protocol {
 }
 
 impl ToMemcached for u8 {
-    fn get_value(&self) -> Result<(Vec<u8>, StoredType), BMemcachedError> {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
         Ok((vec![*self], StoredType::MTYPE_U8))
     }
 }
 
 impl ToMemcached for u16 {
-    fn get_value(&self) -> Result<(Vec<u8>, StoredType), BMemcachedError> {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
         let mut buf = vec![];
         buf.write_u16::<BigEndian>(*self)?;
         Ok((buf, StoredType::MTYPE_U16))
@@ -360,7 +350,7 @@ impl ToMemcached for u16 {
 }
 
 impl ToMemcached for u32 {
-    fn get_value(&self) -> Result<(Vec<u8>, StoredType), BMemcachedError> {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
         let mut buf = vec![];
         buf.write_u32::<BigEndian>(*self)?;
         Ok((buf, StoredType::MTYPE_U32))
@@ -368,7 +358,7 @@ impl ToMemcached for u32 {
 }
 
 impl ToMemcached for u64 {
-    fn get_value(&self) -> Result<(Vec<u8>, StoredType), BMemcachedError> {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
         let mut buf = vec![];
         buf.write_u64::<BigEndian>(*self)?;
         Ok((buf, StoredType::MTYPE_U64))
@@ -376,64 +366,64 @@ impl ToMemcached for u64 {
 }
 
 impl<'a> ToMemcached for &'a String {
-    fn get_value(&self) -> Result<(Vec<u8>, StoredType), BMemcachedError> {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
         let v = *self;
         Ok((v.clone().into_bytes(), StoredType::MTYPE_STRING))
     }
 }
 
 impl<'a> ToMemcached for &'a str {
-    fn get_value(&self) -> Result<(Vec<u8>, StoredType), BMemcachedError> {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
         Ok((self.as_bytes().to_vec(), StoredType::MTYPE_STRING))
     }
 }
 
 impl FromMemcached for String {
-    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self, BMemcachedError> {
+    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self> {
         if flags & StoredType::MTYPE_STRING != StoredType::empty() {
             Ok(String::from_utf8(buf)?)
         } else {
-            Err(BMemcachedError::TypeMismatch(flags))
+            bail!(ErrorKind::TypeMismatch(flags))
         }
     }
 }
 
 impl FromMemcached for u8 {
-    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self, BMemcachedError> {
+    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self> {
         if flags & StoredType::MTYPE_U8 != StoredType::empty() {
             let mut buf = Cursor::new(buf);
             Ok(buf.read_u8()?)
         } else {
-            Err(BMemcachedError::TypeMismatch(flags))
+            bail!(ErrorKind::TypeMismatch(flags))
         }
     }
 }
 
 impl FromMemcached for u16 {
-    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self, BMemcachedError> {
+    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self> {
         if flags & StoredType::MTYPE_U16 != StoredType::empty() {
             let mut buf = Cursor::new(buf);
             Ok(buf.read_u16::<BigEndian>()?)
         } else {
-            Err(BMemcachedError::TypeMismatch(flags))
+            bail!(ErrorKind::TypeMismatch(flags))
         }
     }
 }
 
 impl FromMemcached for u32 {
-    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self, BMemcachedError> {
+    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self> {
         if flags & StoredType::MTYPE_U32 != StoredType::empty() {
             let mut buf = Cursor::new(buf);
             Ok(buf.read_u32::<BigEndian>()?)
         } else {
-            Err(BMemcachedError::TypeMismatch(flags))
+            bail!(ErrorKind::TypeMismatch(flags))
         }
     }
 }
 
 impl FromMemcached for u64 {
     #[allow(unused_variables)]
-    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self, BMemcachedError> {
+    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self> {
         // As increment and decrement don't allow us to send flags, we don't
         // enforce type checking.
         let mut buf = Cursor::new(buf);
@@ -443,7 +433,7 @@ impl FromMemcached for u64 {
 
 impl FromMemcached for Vec<u8> {
     #[allow(unused_variables)]
-    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self, BMemcachedError> {
+    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self> {
         Ok(buf)
     }
 }
@@ -452,7 +442,7 @@ impl FromMemcached for Vec<u8> {
 mod tests {
     extern crate env_logger;
 
-    use errors::BMemcachedError;
+    use errors::{Error, Result};
     use super::*;
 
     #[test]
@@ -515,7 +505,7 @@ mod tests {
         let result = p.add(key, value, 10);
         match result {
             Ok(()) => panic!("Add key should return error"),
-            Err(BMemcachedError::Status(Status::KeyExists)) => {}
+            Err(Error(ErrorKind::Status(Status::KeyExists), _)) => {}
             Err(_) => panic!("Some strange error that should not happen"),
         };
         p.delete(key).unwrap();
@@ -531,10 +521,10 @@ mod tests {
         let rv: String = p.get(key).unwrap();
         assert_eq!(rv, value);
 
-        let not_found: Result<String, BMemcachedError> = p.get("not found".to_string());
+        let not_found: Result<String> = p.get("not found".to_string());
         match not_found {
             Ok(_) => panic!("This key should not exist"),
-            Err(BMemcachedError::Status(Status::KeyNotFound)) => {}
+            Err(Error(ErrorKind::Status(Status::KeyNotFound), _)) => {}
             Err(_) => panic!("This should return KeyNotFound"),
         };
         p.delete(key).unwrap();
