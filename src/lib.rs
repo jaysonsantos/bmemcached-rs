@@ -59,5 +59,7 @@ mod protocol;
 pub mod constants;
 
 pub use protocol::{FromMemcached, Status, ToMemcached};
+#[macro_use] extern crate error_chain;
+
 pub use client::MemcachedClient;
 pub use constants::StoredType;

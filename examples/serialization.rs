@@ -7,7 +7,7 @@ extern crate bmemcached;
 extern crate serde;
 extern crate serde_json;
 use bmemcached::{ToMemcached, FromMemcached, StoredType};
-use bmemcached::errors::BMemcachedError;
+use bmemcached::errors::Result;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Data {
@@ -17,13 +17,13 @@ struct Data {
 }
 
 impl<'a> ToMemcached for &'a Data {
-    fn get_value(&self) -> Result<(Vec<u8>, StoredType), BMemcachedError> {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
         Ok((serde_json::to_vec(self).unwrap(), StoredType::MTYPE_USER_DEFINED_1))
     }
 }
 
 impl FromMemcached for Data {
-    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self, BMemcachedError> {
+    fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self> {
         assert!(flags == StoredType::MTYPE_USER_DEFINED_1);
         Ok(serde_json::from_slice(&*buf).unwrap())
     }

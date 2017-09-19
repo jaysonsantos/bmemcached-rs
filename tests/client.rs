@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::thread;
 
 use bmemcached::{MemcachedClient, Status};
-use bmemcached::errors::BMemcachedError;
+use bmemcached::errors::{Error, ErrorKind};
 
 #[test]
 fn multiple_threads() {
@@ -107,7 +107,7 @@ fn add() {
     let rv: String = client.get(key).unwrap();
     assert_eq!(rv, value);
     match client.add(key, value, 1000) {
-        Err(BMemcachedError::Status(Status::KeyExists)) => (),
+        Err(Error(ErrorKind::Status(Status::KeyExists), _)) => (),
         e => panic!("Wrong status returned {:?}", e),
     }
     client.delete(key).unwrap();
