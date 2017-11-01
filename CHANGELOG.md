@@ -1,3 +1,13 @@
+<a name="0.4.0"></a>
+## 0.4.0 (2017-11-01)
+
+
+#### Features
+
+* **error:**  Change error system to error-chain (#11) ([ea627ee3](https://github.com/jaysonsantos/bmemcached-rs/commit/ea627ee3456f73d39c7097b1f1647039bc74f27f))
+
+
+
 <a name="0.3.0"></a>
 ### 0.3.0 (2017-09-13)
 
