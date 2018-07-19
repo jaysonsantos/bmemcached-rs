@@ -1,5 +1,5 @@
 use constants::StoredType;
-use protocol::Status;
+use protocol::{Status, KEY_MAXIMUM_SIZE};
 
 error_chain! {
     foreign_links {
@@ -17,6 +17,11 @@ error_chain! {
         TypeMismatch(s: StoredType) {
             description("Requested type is different from the one stored in memcached")
             display("Requested type is different from the one stored in memcached: {:?}", s)
+        }
+
+        KeyLengthTooLong(length: usize) {
+            description("Key length is too long")
+            display("Key length {} is too long, the maximum is {}", length, KEY_MAXIMUM_SIZE)
         }
     }
 }
