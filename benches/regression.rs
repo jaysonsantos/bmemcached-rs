@@ -4,11 +4,11 @@ extern crate bmemcached;
 
 use criterion::Criterion;
 
-use bmemcached::MemcachedClient;
+use bmemcached::protocol::Protocol;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let cli = MemcachedClient::new(vec!["127.0.0.1:11211"], 10).unwrap();
-    c.bench_function("set/get/delete", move |b| {
+    c.bench_function("set/get/delete", |b| {
+        let mut cli = Protocol::connect("127.0.0.1:11211").unwrap();
         b.iter(|| {
             let key = "benchmark test";
             cli.set(key, "abc", 10_000).unwrap();
