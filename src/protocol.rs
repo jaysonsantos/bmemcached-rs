@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read, Write};
+use std::io::{BufReader, Cursor, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -84,7 +84,7 @@ pub struct Response {
 
 #[derive(Debug)]
 pub struct Protocol {
-    connection: TcpStream,
+    connection: BufReader<TcpStream>,
 }
 
 pub trait ToMemcached {
@@ -98,12 +98,13 @@ pub trait FromMemcached: Sized {
 impl Protocol {
     pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Protocol> {
         Ok(Protocol {
-            connection: TcpStream::connect(addr)?,
+            connection: BufReader::new(TcpStream::connect(addr)?),
         })
     }
 
     pub fn connection_info(&self) -> String {
-        self.connection.peer_addr().unwrap().to_string()
+        let connection = self.connection.get_ref();
+        connection.peer_addr().unwrap().to_string()
     }
 
     fn build_request(
@@ -130,8 +131,8 @@ impl Protocol {
         })
     }
 
-    fn write_request(&self, request: Request, final_payload: &[u8]) -> Result<()> {
-        let mut buf = &self.connection;
+    fn write_request(&mut self, request: Request, final_payload: &[u8]) -> Result<()> {
+        let buf = self.connection.get_mut();
         buf.write_u8(request.magic)?;
         buf.write_u8(request.opcode)?;
         buf.write_u16::<BigEndian>(request.key_length)?;
@@ -141,12 +142,12 @@ impl Protocol {
         buf.write_u32::<BigEndian>(request.body_length)?;
         buf.write_u32::<BigEndian>(request.opaque)?;
         buf.write_u64::<BigEndian>(request.cas)?;
-        buf.write(final_payload)?;
+        buf.write_all(final_payload)?;
         Ok(())
     }
 
     fn read_response(&mut self) -> Result<Response> {
-        let mut buf = &self.connection;
+        let buf = &mut self.connection;
         let magic: u8 = buf.read_u8()?;
         if magic != Type::Response as u8 {
             // TODO Consume the stream, disconnect or something?
