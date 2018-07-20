@@ -2,7 +2,7 @@ use std::io::{Cursor, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use num::FromPrimitive;
+use enum_primitive::FromPrimitive;
 
 use constants::*;
 use errors::{ErrorKind, Result};
@@ -437,7 +437,7 @@ mod tests {
 
     #[test]
     fn set_key() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Set";
         let value = "World";
@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn set_key_u8() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u8;
@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn set_key_u16() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u16;
@@ -467,7 +467,7 @@ mod tests {
 
     #[test]
     fn set_key_u32() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u32;
@@ -477,7 +477,7 @@ mod tests {
 
     #[test]
     fn set_key_u64() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u64;
@@ -487,7 +487,7 @@ mod tests {
 
     #[test]
     fn add_key() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Add";
         let value = "World";
@@ -503,7 +503,7 @@ mod tests {
 
     #[test]
     fn get_key() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Get";
         let value = "World";
@@ -528,7 +528,7 @@ mod tests {
 
     #[test]
     fn delete_key() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Delete";
         let value = "World";
@@ -539,7 +539,7 @@ mod tests {
 
     #[test]
     fn increment() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Increment";
         assert_eq!(p.increment(key, 1, 0, 1000).unwrap(), 0);
@@ -550,7 +550,7 @@ mod tests {
 
     #[test]
     fn decrement() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Decrement";
         assert_eq!(p.decrement(key, 1, 0, 1000).unwrap(), 0);

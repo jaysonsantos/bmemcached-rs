@@ -6,12 +6,12 @@ extern crate bmemcached;
 use std::sync::Arc;
 use std::thread;
 
-use bmemcached::{MemcachedClient, Status};
 use bmemcached::errors::{Error, ErrorKind};
+use bmemcached::{MemcachedClient, Status};
 
 #[test]
 fn multiple_threads() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let mut threads = vec![];
     let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211"], 5).unwrap());
     for i in 0..4 {
@@ -35,7 +35,7 @@ fn multiple_threads() {
 
 #[test]
 fn get_set_delete() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello Get, Set, Delete Client";
     let value = "World";
@@ -47,7 +47,7 @@ fn get_set_delete() {
 
 #[test]
 fn get_set_u8() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello u8";
     let value = 1 as u8;
@@ -60,7 +60,7 @@ fn get_set_u8() {
 
 #[test]
 fn get_set_u16() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello u16";
     let value = 1 as u16;
@@ -73,7 +73,7 @@ fn get_set_u16() {
 
 #[test]
 fn get_set_u32() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello u32";
     let value = 1 as u32;
@@ -86,7 +86,7 @@ fn get_set_u32() {
 
 #[test]
 fn get_set_u64() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello u64";
     let value = 1 as u64;
@@ -99,7 +99,7 @@ fn get_set_u64() {
 
 #[test]
 fn add() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello Add Client";
     let value = "World";
@@ -115,7 +115,7 @@ fn add() {
 
 #[test]
 fn replace() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello Replace Client";
     let value = "World";
@@ -130,10 +130,9 @@ fn replace() {
     client.delete(key).unwrap();
 }
 
-
 #[test]
 fn increment() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello Increment Client";
     assert_eq!(client.increment(key, 1, 0, 1000).unwrap(), 0);
@@ -141,10 +140,9 @@ fn increment() {
     client.delete(key).unwrap();
 }
 
-
 #[test]
 fn decrement() {
-    let _ = env_logger::init();
+    let _ = env_logger::try_init();
     let client = MemcachedClient::new(vec!["127.0.0.1:11211"], 1).unwrap();
     let key = "Hello Decrement Client";
     assert_eq!(client.decrement(key, 1, 10, 1000).unwrap(), 10);
