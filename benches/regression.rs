@@ -2,15 +2,12 @@
 extern crate criterion;
 extern crate bmemcached;
 
-use std::sync::Arc;
-
 use criterion::Criterion;
 
 use bmemcached::MemcachedClient;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let client = Arc::new(MemcachedClient::new(vec!["127.0.0.1:11211"], 10).unwrap());
-    let cli = client.clone();
+    let cli = MemcachedClient::new(vec!["127.0.0.1:11211"], 10).unwrap();
     c.bench_function("set/get/delete", move |b| {
         b.iter(|| {
             let key = "benchmark test";
