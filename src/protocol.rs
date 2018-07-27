@@ -51,6 +51,7 @@ enum_from_primitive! {
         Success = 0x00,
         KeyNotFound = 0x01,
         KeyExists = 0x02,
+        ValueTooBig = 0x03,
         AuthError = 0x08,
         UnknownCommand = 0x81
     }
@@ -205,7 +206,10 @@ impl Protocol {
                 self.consume_body(response.body_length)?;
                 bail!(ErrorKind::Status(rest))
             }
-            None => bail!("Server returned an unknown status code"),
+            None => bail!(
+                "Server returned an unknown status code 0x{:02x}",
+                response.status
+            ),
         }
     }
 
@@ -447,6 +451,12 @@ mod tests {
         let value = "World";
         p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
+        let data: String = iter::repeat("0").take(1024 * 1024).collect();
+        let err = p.set("big-data", &data, 100_000).unwrap_err();
+        match err.kind() {
+            &ErrorKind::Status(Status::ValueTooBig) => {}
+            e => panic!("Value should not be {:?}", e),
+        }
     }
 
     #[test]
