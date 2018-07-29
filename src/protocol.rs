@@ -52,6 +52,7 @@ enum_from_primitive! {
         KeyNotFound = 0x01,
         KeyExists = 0x02,
         ValueTooBig = 0x03,
+        InvalidArguments = 0x04,
         AuthError = 0x08,
         UnknownCommand = 0x81
     }
@@ -253,7 +254,10 @@ impl Protocol {
                 bail!(ErrorKind::Status(status));
             }
             None => {
-                bail!("Server sent an unknown status code");
+                bail!(
+                    "Server sent an unknown status code 0x{:02x}",
+                    response.status
+                );
             }
         };
         let flags = StoredType::from_bits(self.connection.read_u32::<BigEndian>()?).unwrap();
@@ -281,7 +285,10 @@ impl Protocol {
                 self.consume_body(response.body_length)?;
                 bail!(ErrorKind::Status(status))
             }
-            None => bail!("Server sent an unknown status code"),
+            None => bail!(
+                "Server sent an unknown status code 0x{:02x}",
+                response.status
+            ),
         }
     }
 
