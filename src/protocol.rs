@@ -381,6 +381,12 @@ impl<'a> ToMemcached for &'a str {
     }
 }
 
+impl<'a> ToMemcached for &'a [u8] {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
+        Ok((self.to_vec(), StoredType::MTYPE_VECTOR))
+    }
+}
+
 impl FromMemcached for String {
     fn get_value(flags: StoredType, buf: Vec<u8>) -> Result<Self> {
         if flags & StoredType::MTYPE_STRING != StoredType::empty() {
@@ -503,6 +509,16 @@ mod tests {
         let key = "Hello";
         let value = 1 as u64;
         p.set(key, value, 1000).unwrap();
+        p.delete(key).unwrap();
+    }
+
+    #[test]
+    fn set_key_slice() {
+        let _ = env_logger::try_init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = vec![1, 2, 3];
+        p.set(key, &value[..], 1000).unwrap();
         p.delete(key).unwrap();
     }
 
