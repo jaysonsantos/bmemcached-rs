@@ -1,11 +1,13 @@
-use std::io::{Cursor, Read, Write};
+use std::io::{BufReader, BufWriter, Cursor, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 
-use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
-use num::FromPrimitive;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use enum_primitive::FromPrimitive;
 
 use constants::*;
-use errors::{Result, ErrorKind};
+use errors::{ErrorKind, Result};
+
+pub const KEY_MAXIMUM_SIZE: usize = 250;
 
 enum Type {
     Request = 0x80,
@@ -43,13 +45,14 @@ enum Command {
     // PrependQ = 0x1A
 }
 
-
 enum_from_primitive! {
     #[derive(Debug, PartialEq)]
     pub enum Status {
         Success = 0x00,
         KeyNotFound = 0x01,
         KeyExists = 0x02,
+        ValueTooBig = 0x03,
+        InvalidArguments = 0x04,
         AuthError = 0x08,
         UnknownCommand = 0x81
     }
@@ -83,7 +86,7 @@ pub struct Response {
 
 #[derive(Debug)]
 pub struct Protocol {
-    connection: TcpStream,
+    connection: BufReader<TcpStream>,
 }
 
 pub trait ToMemcached {
@@ -96,11 +99,14 @@ pub trait FromMemcached: Sized {
 
 impl Protocol {
     pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Protocol> {
-        Ok(Protocol { connection: TcpStream::connect(addr)? })
+        Ok(Protocol {
+            connection: BufReader::new(TcpStream::connect(addr)?),
+        })
     }
 
     pub fn connection_info(&self) -> String {
-        self.connection.peer_addr().unwrap().to_string()
+        let connection = self.connection.get_ref();
+        connection.peer_addr().unwrap().to_string()
     }
 
     fn build_request(
@@ -110,8 +116,11 @@ impl Protocol {
         data_type: u8,
         extras_length: usize,
         cas: u64,
-    ) -> Request {
-        Request {
+    ) -> Result<Request> {
+        if key_length > KEY_MAXIMUM_SIZE {
+            bail!(ErrorKind::KeyLengthTooLong(key_length));
+        }
+        Ok(Request {
             magic: Type::Request as u8,
             opcode: command as u8,
             key_length: key_length as u16,
@@ -121,11 +130,12 @@ impl Protocol {
             body_length: (key_length + value_length + extras_length) as u32,
             opaque: 0,
             cas: cas,
-        }
+        })
     }
 
-    fn write_request(&self, request: Request, final_payload: &[u8]) -> Result<()> {
-        let mut buf = &self.connection;
+    fn write_request(&mut self, request: Request, final_payload: &[u8]) -> Result<()> {
+        let connection = self.connection.get_mut();
+        let mut buf = BufWriter::new(connection);
         buf.write_u8(request.magic)?;
         buf.write_u8(request.opcode)?;
         buf.write_u16::<BigEndian>(request.key_length)?;
@@ -136,11 +146,12 @@ impl Protocol {
         buf.write_u32::<BigEndian>(request.opaque)?;
         buf.write_u64::<BigEndian>(request.cas)?;
         buf.write(final_payload)?;
+        buf.flush()?;
         Ok(())
     }
 
     fn read_response(&mut self) -> Result<Response> {
-        let mut buf = &self.connection;
+        let buf = &mut self.connection;
         let magic: u8 = buf.read_u8()?;
         if magic != Type::Response as u8 {
             // TODO Consume the stream, disconnect or something?
@@ -169,23 +180,17 @@ impl Protocol {
         Ok(())
     }
 
-    fn set_add_replace<K, V>(
-        &mut self,
-        command: Command,
-        key: K,
-        value: V,
-        time: u32,
-    ) -> Result<()>
-        where
-            K: AsRef<[u8]>,
-            V: ToMemcached,
+    fn set_add_replace<K, V>(&mut self, command: Command, key: K, value: V, time: u32) -> Result<()>
+    where
+        K: AsRef<[u8]>,
+        V: ToMemcached,
     {
         let key = key.as_ref();
         let (value, flags) = value.get_value()?;
 
         let extras_length = 8; // Flags: u32 and Expiration time: u32
         let request =
-            Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00);
+            Protocol::build_request(command, key.len(), value.len(), 0x00, extras_length, 0x00)?;
         let mut final_payload = vec![];
         // Flags
         final_payload.write_u32::<BigEndian>(flags.bits())?;
@@ -201,41 +206,44 @@ impl Protocol {
                 self.consume_body(response.body_length)?;
                 bail!(ErrorKind::Status(rest))
             }
-            None => bail!("Server returned an unknown status code"),
+            None => bail!(
+                "Server returned an unknown status code 0x{:02x}",
+                response.status
+            ),
         }
     }
 
     pub fn set<K, V>(&mut self, key: K, value: V, time: u32) -> Result<()>
-        where
-            K: AsRef<[u8]>,
-            V: ToMemcached,
+    where
+        K: AsRef<[u8]>,
+        V: ToMemcached,
     {
         self.set_add_replace(Command::Set, key, value, time)
     }
 
     pub fn add<K, V>(&mut self, key: K, value: V, time: u32) -> Result<()>
-        where
-            K: AsRef<[u8]>,
-            V: ToMemcached,
+    where
+        K: AsRef<[u8]>,
+        V: ToMemcached,
     {
         self.set_add_replace(Command::Add, key, value, time)
     }
 
     pub fn replace<K, V>(&mut self, key: K, value: V, time: u32) -> Result<()>
-        where
-            K: AsRef<[u8]>,
-            V: ToMemcached,
+    where
+        K: AsRef<[u8]>,
+        V: ToMemcached,
     {
         self.set_add_replace(Command::Replace, key, value, time)
     }
 
     pub fn get<K, V>(&mut self, key: K) -> Result<V>
-        where
-            K: AsRef<[u8]>,
-            V: FromMemcached,
+    where
+        K: AsRef<[u8]>,
+        V: FromMemcached,
     {
         let key = key.as_ref();
-        let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00);
+        let request = Protocol::build_request(Command::Get, key.len(), 0 as usize, 0, 0, 0x00)?;
         self.write_request(request, key)?;
         let response = self.read_response()?;
         match Status::from_u16(response.status) {
@@ -245,7 +253,10 @@ impl Protocol {
                 bail!(ErrorKind::Status(status));
             }
             None => {
-                bail!("Server sent an unknown status code");
+                bail!(
+                    "Server sent an unknown status code 0x{:02x}",
+                    response.status
+                );
             }
         };
         let flags = StoredType::from_bits(self.connection.read_u32::<BigEndian>()?).unwrap();
@@ -255,11 +266,11 @@ impl Protocol {
     }
 
     pub fn delete<K>(&mut self, key: K) -> Result<()>
-        where
-            K: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]>,
     {
         let key = key.as_ref();
-        let request = Protocol::build_request(Command::Delete, key.len(), 0 as usize, 0, 0, 0x00);
+        let request = Protocol::build_request(Command::Delete, key.len(), 0 as usize, 0, 0, 0x00)?;
         self.write_request(request, key)?;
         let response = self.read_response()?;
 
@@ -273,7 +284,10 @@ impl Protocol {
                 self.consume_body(response.body_length)?;
                 bail!(ErrorKind::Status(status))
             }
-            None => bail!("Server sent an unknown status code"),
+            None => bail!(
+                "Server sent an unknown status code 0x{:02x}",
+                response.status
+            ),
         }
     }
 
@@ -285,12 +299,12 @@ impl Protocol {
         time: u32,
         command: Command,
     ) -> Result<u64>
-        where
-            K: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]>,
     {
         let key = key.as_ref();
         let extras_length = 20; // Amount: u64, Initial: u64, Time: u32
-        let request = Protocol::build_request(command, key.len(), 0, 0, extras_length, 0x00);
+        let request = Protocol::build_request(command, key.len(), 0, 0, extras_length, 0x00)?;
         let mut final_payload: Vec<u8> = vec![];
         final_payload.write_u64::<BigEndian>(amount)?;
         final_payload.write_u64::<BigEndian>(initial)?;
@@ -308,28 +322,16 @@ impl Protocol {
         }
     }
 
-    pub fn increment<K>(
-        &mut self,
-        key: K,
-        amount: u64,
-        initial: u64,
-        time: u32,
-    ) -> Result<u64>
-        where
-            K: AsRef<[u8]>,
+    pub fn increment<K>(&mut self, key: K, amount: u64, initial: u64, time: u32) -> Result<u64>
+    where
+        K: AsRef<[u8]>,
     {
         self.increment_decrement(key, amount, initial, time, Command::Increment)
     }
 
-    pub fn decrement<K>(
-        &mut self,
-        key: K,
-        amount: u64,
-        initial: u64,
-        time: u32,
-    ) -> Result<u64>
-        where
-            K: AsRef<[u8]>,
+    pub fn decrement<K>(&mut self, key: K, amount: u64, initial: u64, time: u32) -> Result<u64>
+    where
+        K: AsRef<[u8]>,
     {
         self.increment_decrement(key, amount, initial, time, Command::Decrement)
     }
@@ -375,6 +377,12 @@ impl<'a> ToMemcached for &'a String {
 impl<'a> ToMemcached for &'a str {
     fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
         Ok((self.as_bytes().to_vec(), StoredType::MTYPE_STRING))
+    }
+}
+
+impl<'a> ToMemcached for &'a [u8] {
+    fn get_value(&self) -> Result<(Vec<u8>, StoredType)> {
+        Ok((self.to_vec(), StoredType::MTYPE_VECTOR))
     }
 }
 
@@ -442,22 +450,30 @@ impl FromMemcached for Vec<u8> {
 mod tests {
     extern crate env_logger;
 
-    use errors::{Error, Result};
+    use std::iter;
+
     use super::*;
+    use errors::{Error, Result};
 
     #[test]
-    fn set_key() {
-        let _ = env_logger::init();
+    fn set() {
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Set";
         let value = "World";
         p.set(key, value, 1000).unwrap();
         p.delete(key).unwrap();
+        let data: String = iter::repeat("0").take(1024 * 1024).collect();
+        let err = p.set("big-data", &data, 100_000).unwrap_err();
+        match err.kind() {
+            &ErrorKind::Status(Status::ValueTooBig) => {}
+            e => panic!("Value should not be {:?}", e),
+        }
     }
 
     #[test]
-    fn set_key_u8() {
-        let _ = env_logger::init();
+    fn set_u8() {
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u8;
@@ -466,8 +482,8 @@ mod tests {
     }
 
     #[test]
-    fn set_key_u16() {
-        let _ = env_logger::init();
+    fn set_u16() {
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u16;
@@ -476,8 +492,8 @@ mod tests {
     }
 
     #[test]
-    fn set_key_u32() {
-        let _ = env_logger::init();
+    fn set_u32() {
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u32;
@@ -486,8 +502,8 @@ mod tests {
     }
 
     #[test]
-    fn set_key_u64() {
-        let _ = env_logger::init();
+    fn set_u64() {
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
         let value = 1 as u64;
@@ -496,8 +512,18 @@ mod tests {
     }
 
     #[test]
+    fn set_slice() {
+        let _ = env_logger::try_init();
+        let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
+        let key = "Hello";
+        let value = vec![1, 2, 3];
+        p.set(key, &value[..], 1000).unwrap();
+        p.delete(key).unwrap();
+    }
+
+    #[test]
     fn add_key() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Add";
         let value = "World";
@@ -513,7 +539,7 @@ mod tests {
 
     #[test]
     fn get_key() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Get";
         let value = "World";
@@ -528,11 +554,17 @@ mod tests {
             Err(_) => panic!("This should return KeyNotFound"),
         };
         p.delete(key).unwrap();
+        let big_key: String = iter::repeat("0").take(260).collect();
+        match p.get::<_, Vec<u8>>(big_key) {
+            Ok(_) => panic!("Should be an error"),
+            Err(Error(ErrorKind::KeyLengthTooLong(260), _)) => {}
+            Err(e) => panic!("This should be KeyLengthTooLong and not {:?}", e),
+        };
     }
 
     #[test]
     fn delete_key() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Delete";
         let value = "World";
@@ -543,7 +575,7 @@ mod tests {
 
     #[test]
     fn increment() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Increment";
         assert_eq!(p.increment(key, 1, 0, 1000).unwrap(), 0);
@@ -554,7 +586,7 @@ mod tests {
 
     #[test]
     fn decrement() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Decrement";
         assert_eq!(p.decrement(key, 1, 0, 1000).unwrap(), 0);

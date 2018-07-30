@@ -43,6 +43,7 @@ fn main() {
 }
 ```
 */
+#![forbid(unsafe_code)]
 #[macro_use]
 extern crate bitflags;
 extern crate byteorder;
@@ -54,12 +55,13 @@ extern crate log;
 extern crate num;
 
 mod client;
-pub mod errors;
-mod protocol;
 pub mod constants;
+pub mod errors;
+pub mod protocol;
 
 pub use protocol::{FromMemcached, Status, ToMemcached};
-#[macro_use] extern crate error_chain;
+#[macro_use]
+extern crate error_chain;
 
 pub use client::MemcachedClient;
 pub use constants::StoredType;

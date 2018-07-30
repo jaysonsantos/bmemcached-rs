@@ -5,7 +5,6 @@ bitflags! {
             const MTYPE_U16             = 1 << 2;
             const MTYPE_U32             = 1 << 3;
             const MTYPE_U64             = 1 << 4;
-            #[allow(dead_code)]
             const MTYPE_VECTOR          = 1 << 5;
             #[allow(dead_code)]
             const MTYPE_COMPRESSED      = 1 << 6;
