@@ -135,19 +135,18 @@ impl Protocol {
 
     fn write_request(&mut self, request: Request, final_payload: &[u8]) -> Result<()> {
         let connection = self.connection.get_mut();
-        {
-            let mut buf = BufWriter::new(connection);
-            buf.write_u8(request.magic)?;
-            buf.write_u8(request.opcode)?;
-            buf.write_u16::<BigEndian>(request.key_length)?;
-            buf.write_u8(request.extras_length)?;
-            buf.write_u8(request.data_type)?;
-            buf.write_u16::<BigEndian>(request.reserved)?;
-            buf.write_u32::<BigEndian>(request.body_length)?;
-            buf.write_u32::<BigEndian>(request.opaque)?;
-            buf.write_u64::<BigEndian>(request.cas)?;
-            buf.write(final_payload)?;
-        }
+        let mut buf = BufWriter::new(connection);
+        buf.write_u8(request.magic)?;
+        buf.write_u8(request.opcode)?;
+        buf.write_u16::<BigEndian>(request.key_length)?;
+        buf.write_u8(request.extras_length)?;
+        buf.write_u8(request.data_type)?;
+        buf.write_u16::<BigEndian>(request.reserved)?;
+        buf.write_u32::<BigEndian>(request.body_length)?;
+        buf.write_u32::<BigEndian>(request.opaque)?;
+        buf.write_u64::<BigEndian>(request.cas)?;
+        buf.write(final_payload)?;
+        buf.flush()?;
         Ok(())
     }
 
