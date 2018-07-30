@@ -457,7 +457,7 @@ mod tests {
     use errors::{Error, Result};
 
     #[test]
-    fn set_key() {
+    fn set() {
         let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello Set";
@@ -473,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn set_key_u8() {
+    fn set_u8() {
         let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
@@ -483,7 +483,7 @@ mod tests {
     }
 
     #[test]
-    fn set_key_u16() {
+    fn set_u16() {
         let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
@@ -493,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn set_key_u32() {
+    fn set_u32() {
         let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
@@ -503,7 +503,7 @@ mod tests {
     }
 
     #[test]
-    fn set_key_u64() {
+    fn set_u64() {
         let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
@@ -513,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn set_key_slice() {
+    fn set_slice() {
         let _ = env_logger::try_init();
         let mut p = Protocol::connect("127.0.0.1:11211").unwrap();
         let key = "Hello";
