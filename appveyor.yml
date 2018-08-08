@@ -1,0 +1,24 @@
+# Configuration file based on https://raw.githubusercontent.com/BurntSushi/rust-csv/master/appveyor.yml
+environment:
+  matrix:
+  - TARGET: x86_64-pc-windows-msvc
+  - TARGET: i686-pc-windows-msvc
+  - TARGET: i686-pc-windows-gnu
+install:
+  - ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-nightly-${env:TARGET}.exe"
+  - rust-nightly-%TARGET%.exe /VERYSILENT /NORESTART /DIR="C:\Program Files (x86)\Rust"
+  - SET PATH=%PATH%;C:\Program Files (x86)\Rust\bin
+  - SET PATH=%PATH%;C:\MinGW\bin
+  - rustc -V
+  - cargo -V
+
+  # Got from https://github.com/frerich/clcache/blob/master/appveyor.yml
+  - appveyor DownloadFile "http://s3.amazonaws.com/downloads.northscale.com/memcached-win64-1.4.4-14.zip" -FileName memcached.zip
+  - 7z x memcached.zip -y
+  - ps: $Memcached = Start-Process memcached\memcached.exe -PassThru
+
+build: false
+
+test_script:
+  - cargo build --verbose
+  - cargo test --verbose
