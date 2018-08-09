@@ -1,4 +1,8 @@
-# bmemcached-rs [![Build Status](https://travis-ci.org/jaysonsantos/bmemcached-rs.svg?branch=master)](https://travis-ci.org/jaysonsantos/bmemcached-rs) [![Clippy Linting Result](https://clippy.bashy.io/github/jaysonsantos/bmemcached-rs/master/badge.svg)](https://clippy.bashy.io/github/jaysonsantos/bmemcached-rs/master/log)
+# bmemcached-rs
+
+[![Build Status](https://travis-ci.org/jaysonsantos/bmemcached-rs.svg?branch=master)](https://travis-ci.org/jaysonsantos/bmemcached-rs)
+[![Build status](https://ci.appveyor.com/api/projects/status/ile6fh5ro8so2ctm/branch/master?svg=true)](https://ci.appveyor.com/project/jaysonsantos/bmemcached-rs/branch/master)
+
 Rust binary memcached implementation (ON GOING)
 
 # Usage
